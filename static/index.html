@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PROMAN Quotation Engine</title>
+<style>
+  :root {
+    --navy: #1F3864; --blue: #2E75B6; --light-blue: #BDD7EE;
+    --yellow: #F2CC0C; --green: #375623; --red: #C00000;
+    --bg: #f0f4f8; --card: #ffffff; --border: #d1dce8;
+    --text: #1a2030; --muted: #6b7a90;
+    --font: 'Segoe UI', system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); font-family: var(--font); color: var(--text); font-size: 13px; }
+
+  /* HEADER */
+  header { background: var(--navy); color: white; padding: 12px 24px; display: flex; align-items: center; gap: 16px; }
+  header h1 { font-size: 16px; letter-spacing: .5px; }
+  header span { font-size: 11px; color: #a0b8d8; margin-left: auto; }
+
+  /* LAYOUT */
+  .layout { display: grid; grid-template-columns: 380px 1fr; gap: 0; height: calc(100vh - 46px); overflow: hidden; }
+  .sidebar { background: var(--card); border-right: 1px solid var(--border); overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+  .main { overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+
+  /* CARDS */
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .card-header { background: var(--navy); color: white; padding: 8px 12px; font-size: 11px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
+  .card-header .badge { background: var(--blue); border-radius: 10px; padding: 1px 7px; font-size: 10px; }
+  .card-body { padding: 12px; }
+
+  /* FORM ELEMENTS */
+  .form-row { margin-bottom: 9px; }
+  .form-row label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 3px; font-weight: 500; }
+  .form-row input, .form-row select, .form-row textarea {
+    width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px;
+    font-size: 12px; font-family: var(--font); background: #fafbfc; color: var(--text);
+    transition: border-color .15s;
+  }
+  .form-row input:focus, .form-row select:focus, .form-row textarea:focus {
+    outline: none; border-color: var(--blue); background: white;
+  }
+  .form-row textarea { resize: vertical; min-height: 60px; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .form-check { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+  .form-check input { width: auto; }
+  .form-check label { font-size: 12px; color: var(--text); margin: 0; }
+
+  /* BUTTONS */
+  .btn { padding: 7px 16px; border-radius: 4px; border: none; cursor: pointer; font-size: 12px; font-weight: 600; letter-spacing: .3px; display: inline-flex; align-items: center; gap: 6px; transition: all .15s; }
+  .btn-primary { background: var(--blue); color: white; }
+  .btn-primary:hover { background: #1a5a9a; }
+  .btn-navy { background: var(--navy); color: white; }
+  .btn-navy:hover { background: #152745; }
+  .btn-green { background: var(--green); color: white; }
+  .btn-green:hover { background: #254018; }
+  .btn-outline { background: white; color: var(--navy); border: 1px solid var(--navy); }
+  .btn-outline:hover { background: var(--light-blue); }
+  .btn-sm { padding: 4px 10px; font-size: 11px; }
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+  /* TRIAGE BADGE */
+  .triage-result { border-radius: 4px; padding: 8px 10px; font-size: 11px; margin-top: 6px; }
+  .triage-standalone { background: #eef6ff; border: 1px solid #2E75B6; color: #1a4a80; }
+  .triage-quote      { background: #eefbee; border: 1px solid #2a7040; color: #1a5030; }
+  .triage-qualify    { background: #fffaee; border: 1px solid #d4a017; color: #7a5010; }
+  .triage-route_out  { background: #ffeeee; border: 1px solid #c00000; color: #800000; }
+
+  /* SUMMARY TABLE */
+  .summary-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .summary-table th { background: var(--navy); color: white; padding: 6px 8px; text-align: left; font-weight: 600; font-size: 11px; }
+  .summary-table td { padding: 5px 8px; border-bottom: 1px solid var(--border); }
+  .summary-table tr:nth-child(even) td { background: #f5f8fc; }
+  .summary-table tr.total-row td { background: var(--yellow); font-weight: 700; color: var(--navy); }
+  .summary-table tr.grand-row td { background: var(--green); color: white; font-weight: 700; font-size: 13px; }
+  .summary-table tr.section-row td { background: var(--light-blue); font-weight: 600; color: var(--navy); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; }
+
+  /* WARNING */
+  .warning { background: #fff8e6; border: 1px solid #d97706; border-radius: 4px; padding: 7px 10px; font-size: 11px; color: #7a4500; margin-top: 6px; }
+  .warning-icon { font-style: normal; }
+  .flag { display: inline-block; background: #fff3cd; border: 1px solid #ffc107; border-radius: 3px; padding: 1px 5px; font-size: 10px; color: #856404; margin-left: 4px; }
+
+  /* CONVEYOR TABLE */
+  .conv-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .conv-table th { background: var(--blue); color: white; padding: 4px 6px; font-weight: 600; }
+  .conv-table td { padding: 3px 6px; border-bottom: 1px solid #e0e8f0; }
+  .conv-table tr:nth-child(even) td { background: #f5f8fc; }
+
+  /* TOTALS PANEL */
+  .totals-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+  .kpi-box { background: var(--light-blue); border-radius: 5px; padding: 10px 12px; }
+  .kpi-box.grand { background: var(--navy); color: white; }
+  .kpi-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
+  .kpi-box.grand .kpi-label { color: #a0b8d8; }
+  .kpi-value { font-size: 18px; font-weight: 700; color: var(--navy); margin-top: 2px; }
+  .kpi-box.grand .kpi-value { color: var(--yellow); }
+  .kpi-sub { font-size: 10px; color: var(--muted); }
+  .kpi-box.grand .kpi-sub { color: #8ab0d0; }
+
+  /* TABS */
+  .tabs { display: flex; gap: 2px; border-bottom: 2px solid var(--border); margin-bottom: 12px; }
+  .tab { padding: 6px 14px; font-size: 12px; font-weight: 500; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -2px; }
+  .tab.active { color: var(--blue); border-bottom-color: var(--blue); font-weight: 600; }
+  .tab-pane { display: none; }
+  .tab-pane.active { display: block; }
+
+  /* SPINNER */
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3); border-top-color: white; border-radius: 50%; animation: spin .6s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* STANDALONE MODE */
+  .mode-toggle { display: flex; gap: 0; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; margin-bottom: 12px; }
+  .mode-btn { flex: 1; padding: 6px; text-align: center; cursor: pointer; font-size: 11px; font-weight: 500; background: white; color: var(--muted); border: none; }
+  .mode-btn.active { background: var(--navy); color: white; }
+
+  /* EMPTY STATE */
+  .empty { text-align: center; padding: 40px 20px; color: var(--muted); }
+  .empty-icon { font-size: 36px; margin-bottom: 8px; }
+  .empty p { font-size: 12px; }
+
+  /* STATUS BAR */
+  .status-bar { font-size: 10px; color: var(--muted); padding: 4px 12px; background: #f5f8fc; border-top: 1px solid var(--border); }
+
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; height: auto; }
+    .sidebar { overflow-y: visible; }
+    .totals-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div style="width:28px;height:28px;background:#2E75B6;border-radius:4px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px">P</div>
+  <h1>PROMAN Quotation Engine</h1>
+  <span id="status-msg">Ready</span>
+</header>
+
+<div class="layout">
+  <!-- SIDEBAR: INPUT -->
+  <div class="sidebar">
+
+    <!-- Mode toggle -->
+    <div class="mode-toggle">
+      <button class="mode-btn active" onclick="setMode('plant')" id="mode-plant">🏗 Full Plant Quote</button>
+      <button class="mode-btn" onclick="setMode('standalone')" id="mode-standalone">⚙️ Single Equipment</button>
+    </div>
+
+    <!-- TRIAGE BOX -->
+    <div class="card" id="triage-card">
+      <div class="card-header">📋 Paste Enquiry → Auto-Triage</div>
+      <div class="card-body">
+        <div class="form-row">
+          <textarea id="enquiry-text" placeholder="Paste raw enquiry here…&#10;e.g. Ramesh Quarries, 500 TPH 3-stage granite plant"></textarea>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="runTriage()">Analyse Enquiry</button>
+        <div id="triage-result"></div>
+      </div>
+    </div>
+
+    <!-- PLANT FORM -->
+    <div id="plant-form">
+      <div class="card">
+        <div class="card-header">🏗 Plant Specification</div>
+        <div class="card-body">
+          <div class="form-row"><label>Client Name *</label><input id="f-client" placeholder="e.g. Ramesh Quarries" /></div>
+          <div class="form-row"><label>Ref. No.</label><input id="f-ref" placeholder="PR/09-26/N-001" /></div>
+          <div class="form-grid">
+            <div class="form-row"><label>Capacity (TPH) *</label><input id="f-tph" type="number" value="250" min="50" max="800"/></div>
+            <div class="form-row"><label>Stages *</label>
+              <select id="f-stages">
+                <option value="2">2-Stage</option>
+                <option value="3" selected>3-Stage</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-grid">
+            <div class="form-row"><label>Max Feed Size (mm)</label><input id="f-feed" type="number" value="650"/></div>
+            <div class="form-row"><label>Material</label>
+              <select id="f-material">
+                <option>Granite/Basalt</option><option>Granite</option><option>Basalt</option>
+                <option>Limestone</option><option>Dolomite</option><option>Quartzite</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row"><label>Output Products (one per line)</label>
+            <textarea id="f-products" rows="4" placeholder="GSB&#10;-40+20mm&#10;-20+10mm&#10;-10+6mm&#10;0-4.75mm"></textarea>
+          </div>
+          <div class="form-check">
+            <input type="checkbox" id="f-mobile">
+            <label for="f-mobile">Portable / Skid-mounted plant</label>
+          </div>
+          <details style="margin-top:4px">
+            <summary style="font-size:11px;color:var(--muted);cursor:pointer">Advanced overrides</summary>
+            <div style="margin-top:8px">
+              <div class="form-grid">
+                <div class="form-row"><label>VGF model</label><input id="f-vgf" placeholder="auto"/></div>
+                <div class="form-row"><label>Jaw model</label><input id="f-jaw" placeholder="auto"/></div>
+              </div>
+              <div class="form-grid">
+                <div class="form-row"><label>Cone model</label><input id="f-cone" placeholder="auto"/></div>
+                <div class="form-row"><label>VSI model</label><input id="f-vsi" placeholder="auto"/></div>
+              </div>
+              <div class="form-grid">
+                <div class="form-row"><label>WSG Size</label>
+                  <select id="f-wsg"><option value="">None</option><option>40</option><option>70</option><option>120</option></select>
+                </div>
+                <div class="form-row"><label>Jaw Discharge H (m)</label><input id="f-jh" type="number" value="1.83" step="0.1"/></div>
+              </div>
+            </div>
+          </details>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btn-quote" onclick="runQuote()">⚡ Generate Quote</button>
+        <button class="btn btn-outline" onclick="resetForm()">Reset</button>
+      </div>
+    </div>
+
+    <!-- STANDALONE FORM -->
+    <div id="standalone-form" style="display:none">
+      <div class="card">
+        <div class="card-header">⚙️ Single Equipment</div>
+        <div class="card-body">
+          <div class="form-row"><label>Client Name</label><input id="s-client" placeholder="Client name for letter"/></div>
+          <div class="form-row"><label>Ref. No.</label><input id="s-ref" placeholder="PR/09-26/N-001"/></div>
+          <div class="form-grid">
+            <div class="form-row"><label>Category</label>
+              <select id="s-cat">
+                <option value="VSI">VSI</option>
+                <option value="JAW">Jaw Crusher</option>
+                <option value="CONE">Cone Crusher</option>
+                <option value="VGF">VGF</option>
+                <option value="SCREEN">Screen</option>
+                <option value="WSG">WSG</option>
+              </select>
+            </div>
+            <div class="form-row"><label>Model</label><input id="s-model" placeholder="e.g. 300"/></div>
+          </div>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="runStandalone()">⚡ Get Price</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- MAIN: RESULTS -->
+  <div class="main" id="results-area">
+    <div class="empty">
+      <div class="empty-icon">📊</div>
+      <p>Fill in the plant spec and click <strong>Generate Quote</strong><br>to see the price schedule here.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '';  // same origin
+let lastQuoteReq = null;
+let currentMode = 'plant';
+
+function setMode(m) {
+  currentMode = m;
+  document.getElementById('mode-plant').classList.toggle('active', m==='plant');
+  document.getElementById('mode-standalone').classList.toggle('active', m==='standalone');
+  document.getElementById('plant-form').style.display = m==='plant' ? '' : 'none';
+  document.getElementById('standalone-form').style.display = m==='standalone' ? '' : 'none';
+  document.getElementById('triage-card').style.display = m==='plant' ? '' : 'none';
+}
+
+function setStatus(msg) { document.getElementById('status-msg').textContent = msg; }
+
+async function runTriage() {
+  const text = document.getElementById('enquiry-text').value.trim();
+  if (!text) return;
+  setStatus('Analysing enquiry…');
+  const r = await fetch(API+'/api/triage', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({enquiry_text:text})});
+  const d = await r.json();
+  setStatus('Triage complete');
+
+  const cls = {
+    quote_standalone:'triage-standalone',
+    quote:'triage-quote',
+    quote_with_structural_addon:'triage-quote',
+    qualify:'triage-qualify',
+    route_out:'triage-route_out'
+  }[d.action] || 'triage-qualify';
+
+  const actionLabel = {
+    quote_standalone:'✅ Standalone equipment — see Single Equipment tab',
+    quote:'✅ Proceed to Full Plant Quote',
+    quote_with_structural_addon:'✅ Portable plant — engineering addon needed',
+    qualify:'⚠️ Need more info before quoting',
+    route_out:'🚫 Out of scope'
+  }[d.action] || d.action;
+
+  let html = `<div class="triage-result ${cls}"><strong>${actionLabel}</strong><br><small>${d.reason}</small>`;
+  if (d.detected_tph) html += `<br><small>TPH detected: ${d.detected_tph}</small>`;
+  if (d.detected_model) html += `<br><small>Model: ${d.detected_category} ${d.detected_model}</small>`;
+  if (d.engineering_review_flags?.length) {
+    d.engineering_review_flags.forEach(f => { html += `<br><small>⚠️ ${f}</small>`; });
+  }
+  html += '</div>';
+
+  // Auto-fill TPH if detected
+  if (d.detected_tph) document.getElementById('f-tph').value = d.detected_tph;
+  if (d.action === 'quote_standalone' && d.detected_model) {
+    setMode('standalone');
+    document.getElementById('s-cat').value = d.detected_category || 'VSI';
+    document.getElementById('s-model').value = d.detected_model;
+  }
+
+  document.getElementById('triage-result').innerHTML = html;
+}
+
+function buildQuoteReq() {
+  const products = document.getElementById('f-products').value.trim().split('\n').map(s=>s.trim()).filter(Boolean);
+  return {
+    client_name:   document.getElementById('f-client').value || 'Client',
+    tph:           parseInt(document.getElementById('f-tph').value) || 250,
+    stages:        parseInt(document.getElementById('f-stages').value),
+    feed_size_mm:  parseInt(document.getElementById('f-feed').value) || 650,
+    material:      document.getElementById('f-material').value,
+    products,
+    mobile:        document.getElementById('f-mobile').checked,
+    jaw_discharge_h: parseFloat(document.getElementById('f-jh').value) || 1.83,
+    vgf_model:     document.getElementById('f-vgf').value || null,
+    jaw_model:     document.getElementById('f-jaw').value || null,
+    cone_model:    document.getElementById('f-cone').value || null,
+    vsi_model:     document.getElementById('f-vsi').value || null,
+    wsg_size:      document.getElementById('f-wsg').value || null,
+    ref_no:        document.getElementById('f-ref').value || '',
+  };
+}
+
+async function runQuote() {
+  const req = buildQuoteReq();
+  if (!req.client_name || req.client_name === 'Client') {
+    document.getElementById('f-client').focus(); return;
+  }
+  lastQuoteReq = req;
+  const btn = document.getElementById('btn-quote');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Generating…';
+  setStatus('Building quotation…');
+
+  try {
+    const r = await fetch(API+'/api/quote', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(req)});
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'API error');
+    renderQuoteResult(d, req);
+    setStatus(`Quote ready — ₹${d.totals.grand_total_list}L (List)`);
+  } catch(e) {
+    setStatus('Error: '+e.message);
+    document.getElementById('results-area').innerHTML = `<div class="warning">⚠️ ${e.message}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '⚡ Generate Quote';
+  }
+}
+
+async function runStandalone() {
+  const req = {
+    category: document.getElementById('s-cat').value,
+    model:    document.getElementById('s-model').value.trim(),
+    client_name: document.getElementById('s-client').value || 'Client',
+    ref_no:   document.getElementById('s-ref').value || '',
+  };
+  if (!req.model) { document.getElementById('s-model').focus(); return; }
+  setStatus('Fetching price…');
+
+  const r = await fetch(API+'/api/quote/standalone', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(req)});
+  const d = await r.json();
+  renderStandaloneResult(d, req);
+  setStatus(`${req.category} ${req.model}: List ₹${d.list}L / Best ₹${d.best}L`);
+}
+
+function renderStandaloneResult(d, req) {
+  let html = `
+  <div class="card">
+    <div class="card-header">⚙️ ${req.category} ${req.model} — Price</div>
+    <div class="card-body">
+      <div class="totals-grid">
+        <div class="kpi-box"><div class="kpi-label">List Price</div><div class="kpi-value">₹${d.list ?? '—'}L</div></div>
+        <div class="kpi-box"><div class="kpi-label">Best Price</div><div class="kpi-value">₹${d.best ?? '—'}L</div></div>
+        <div class="kpi-box grand"><div class="kpi-label">Drive HP</div><div class="kpi-value">${d.hp ?? '—'}</div></div>
+      </div>`;
+  if (d.starter_soft) {
+    html += `<p style="font-size:11px;color:var(--muted)">Soft Starter: List ₹${d.starter_soft.list}L / Best ₹${d.starter_soft.best}L</p>`;
+  }
+  if (d.flags?.length) {
+    d.flags.forEach(f => { html += `<div class="warning">⚠️ ${f}</div>`; });
+  }
+  html += `<div class="btn-row">
+    <button class="btn btn-green btn-sm" onclick="downloadStandaloneDocx()">⬇ Offer Letter (.docx)</button>
+  </div>`;
+  html += '</div></div>';
+  document.getElementById('results-area').innerHTML = html;
+  window._lastStandaloneReq = req;
+}
+
+function renderQuoteResult(d, req) {
+  const t = d.totals;
+  let warnHtml = '';
+  if (d.warnings?.length) {
+    warnHtml = d.warnings.map(w => `<div class="warning"><i class="warning-icon">⚠️</i> ${w}</div>`).join('');
+  }
+
+  // Sub A table
+  let subARows = d.sub_a.map((item, i) => {
+    const flagHtml = item.flags?.length ? `<span class="flag">⚠</span>` : '';
+    return `<tr>
+      <td>${item.sl}</td>
+      <td>${item.description}${flagHtml}</td>
+      <td style="text-align:center">${item.qty}</td>
+      <td style="text-align:center">${item.hp}</td>
+      <td style="text-align:right">${item.list_price ?? '—'}</td>
+      <td style="text-align:right">${item.best_price ?? '—'}</td>
+    </tr>`;
+  }).join('');
+
+  // Conveyor table
+  let convRows = d.sub_b_conveyors.map(c =>
+    `<tr><td>${c.tag}</td><td>${c.width_mm}mm × ${c.length_m}m</td><td>${c.hp} HP</td><td style="text-align:right">₹${c.cost}L</td><td style="font-size:10px;color:var(--muted)">${c.purpose.replace(/_/g,' ')}</td></tr>`
+  ).join('');
+
+  const html = `
+  <!-- KPI Row -->
+  <div class="totals-grid">
+    <div class="kpi-box">
+      <div class="kpi-label">Grand Total — List</div>
+      <div class="kpi-value">₹${t.grand_total_list}L</div>
+      <div class="kpi-sub">Sub A+B+C+D+E</div>
+    </div>
+    <div class="kpi-box">
+      <div class="kpi-label">Grand Total — Best</div>
+      <div class="kpi-value">₹${t.grand_total_best}L</div>
+      <div class="kpi-sub">Negotiated / Best price</div>
+    </div>
+    <div class="kpi-box grand">
+      <div class="kpi-label">Connected Load</div>
+      <div class="kpi-value">${t.total_hp} HP</div>
+      <div class="kpi-sub">${req.tph} TPH · ${req.stages}-Stage</div>
+    </div>
+  </div>
+
+  ${warnHtml}
+
+  <!-- Download buttons -->
+  <div class="btn-row">
+    <button class="btn btn-green" onclick="downloadXlsx()">⬇ Price Schedule (.xlsx)</button>
+    <button class="btn btn-navy" onclick="downloadDocx()">⬇ Offer Letter (.docx)</button>
+  </div>
+
+  <!-- Tabs -->
+  <div class="card">
+    <div class="card-body" style="padding-bottom:0">
+      <div class="tabs">
+        <div class="tab active" onclick="switchTab('tab-summary',this)">Summary</div>
+        <div class="tab" onclick="switchTab('tab-equipment',this)">Equipment (A)</div>
+        <div class="tab" onclick="switchTab('tab-conveyors',this)">Conveyors (B)</div>
+      </div>
+
+      <!-- Summary tab -->
+      <div class="tab-pane active" id="tab-summary">
+        <table class="summary-table">
+          <thead><tr><th>Sub</th><th>Description</th><th style="text-align:right">List (₹L)</th><th style="text-align:right">Best (₹L)</th></tr></thead>
+          <tbody>
+            <tr class="section-row"><td colspan="4">A — Main Mechanical Equipment</td></tr>
+            <tr><td>A</td><td>Sub Total — Equipment</td><td style="text-align:right">${t.sub_a_list}</td><td style="text-align:right">${t.sub_a_best}</td></tr>
+            <tr class="section-row"><td colspan="4">B — Belt Conveyor System</td></tr>
+            <tr><td>B</td><td>Sub Total — Conveyors + Chutes (${d.sub_b_conveyors.length} belts)</td><td style="text-align:right">${t.sub_b_list}</td><td style="text-align:right">${t.sub_b_list}</td></tr>
+            <tr class="section-row"><td colspan="4">C — Structural Steel</td></tr>
+            <tr><td>C</td><td>Sub Total — Structural Fabricated Items</td><td style="text-align:right">${d.sub_c_list}</td><td style="text-align:right">${d.sub_c_best}</td></tr>
+            <tr class="section-row"><td colspan="4">D — Electrical</td></tr>
+            <tr><td>D</td><td>Sub Total — MCC Panel + Cables</td><td style="text-align:right">${d.sub_d_list}</td><td style="text-align:right">${d.sub_d_best}</td></tr>
+            <tr class="total-row"><td colspan="2"><strong>TOTAL (A+B+C+D)</strong></td><td style="text-align:right"><strong>${t.total_list}</strong></td><td style="text-align:right"><strong>${t.total_best}</strong></td></tr>
+            <tr><td>E</td><td>Erection &amp; Commissioning</td><td style="text-align:right">${d.erection}</td><td style="text-align:right">${d.erection}</td></tr>
+            <tr class="grand-row"><td colspan="2">GRAND TOTAL (A+B+C+D+E)</td><td style="text-align:right">₹${t.grand_total_list}L</td><td style="text-align:right">₹${t.grand_total_best}L</td></tr>
+          </tbody>
+        </table>
+        <p style="font-size:10px;color:var(--muted);margin-top:6px">Ex-Works Bengaluru. GST extra. Validity 30 days.</p>
+      </div>
+
+      <!-- Equipment tab -->
+      <div class="tab-pane" id="tab-equipment">
+        <table class="summary-table">
+          <thead><tr><th>Sl</th><th>Description</th><th>Qty</th><th>HP</th><th style="text-align:right">List (₹L)</th><th style="text-align:right">Best (₹L)</th></tr></thead>
+          <tbody>${subARows}</tbody>
+        </table>
+      </div>
+
+      <!-- Conveyors tab -->
+      <div class="tab-pane" id="tab-conveyors">
+        <table class="conv-table">
+          <thead><tr><th>Tag</th><th>Size</th><th>HP</th><th>Cost (₹L)</th><th>Purpose</th></tr></thead>
+          <tbody>${convRows}</tbody>
+        </table>
+        <p style="font-size:10px;color:var(--muted);margin-top:6px">Chutes &amp; supports: ₹${d.sub_b_chutes_list}L | Total conveyors HP: ${t.sub_b_hp}</p>
+      </div>
+    </div>
+  </div>`;
+
+  document.getElementById('results-area').innerHTML = html;
+}
+
+function switchTab(id, el) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  el.classList.add('active');
+}
+
+async function downloadXlsx() {
+  if (!lastQuoteReq) return;
+  setStatus('Generating Excel…');
+  const r = await fetch(API+'/api/quote/download/xlsx', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(lastQuoteReq)});
+  const blob = await r.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download=r.headers.get('content-disposition')?.split('filename=')[1] || 'PriceSchedule.xlsx';
+  a.click(); URL.revokeObjectURL(url);
+  setStatus('Excel downloaded.');
+}
+
+async function downloadDocx() {
+  if (!lastQuoteReq) return;
+  setStatus('Generating Word letter…');
+  const r = await fetch(API+'/api/quote/download/docx', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(lastQuoteReq)});
+  const blob = await r.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='OfferLetter.docx';
+  a.click(); URL.revokeObjectURL(url);
+  setStatus('Word letter downloaded.');
+}
+
+async function downloadStandaloneDocx() {
+  const req = window._lastStandaloneReq;
+  if (!req) return;
+  const r = await fetch(API+'/api/quote/standalone/download/docx', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(req)});
+  const blob = await r.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='StandaloneOffer.docx';
+  a.click();
+}
+
+function resetForm() {
+  document.getElementById('f-client').value='';
+  document.getElementById('f-tph').value='250';
+  document.getElementById('f-stages').value='3';
+  document.getElementById('enquiry-text').value='';
+  document.getElementById('triage-result').innerHTML='';
+  document.getElementById('results-area').innerHTML='<div class="empty"><div class="empty-icon">📊</div><p>Fill in the plant spec and click <strong>Generate Quote</strong>.</p></div>';
+  setStatus('Ready');
+  lastQuoteReq = null;
+}
+</script>
+</body>
+</html>
