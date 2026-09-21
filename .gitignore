@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+.env.*
+
+# NEVER commit user credentials
+engine/users.json
+
+# Temp files
+/tmp/
+*.tmp

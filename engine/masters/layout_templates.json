@@ -1,0 +1,79 @@
+{
+  "_meta": {
+    "description": "Standard plant layout arrangement templates. Each template defines how equipment is positioned relative to each other. Coordinates are normalised — the engine scales them to fit the actual plot dimensions.",
+    "last_updated": "",
+    "updated_by": ""
+  },
+  "cascade": {
+    "name": "Cascade (Stepped) Layout",
+    "description": "Equipment arranged in a stepped formation with natural gravity flow. Each stage higher than the next. Classic PROMAN configuration.",
+    "best_for": "Sloped sites or plots where natural fall is available. Reduces conveyor lengths.",
+    "typical_plot_m": "60 x 40",
+    "arrangement": [
+      {"seq": 1, "equipment": "VGF",    "rel_x": 0.05, "rel_y": 0.10, "is_elevated": false, "feeds_to": "JAW"},
+      {"seq": 2, "equipment": "JAW",    "rel_x": 0.05, "rel_y": 0.35, "is_elevated": false, "feeds_to": "SCREEN or CONE"},
+      {"seq": 3, "equipment": "CONE",   "rel_x": 0.40, "rel_y": 0.20, "is_elevated": true,  "feeds_to": "SCREEN"},
+      {"seq": 4, "equipment": "SCREEN", "rel_x": 0.60, "rel_y": 0.35, "is_elevated": true,  "feeds_to": "VSI or PRODUCTS"},
+      {"seq": 5, "equipment": "VSI",    "rel_x": 0.80, "rel_y": 0.20, "is_elevated": true,  "feeds_to": "SCREEN2 or PRODUCTS"}
+    ],
+    "rules": [
+      "VGF and JAW always at ground level",
+      "Cone elevated on platform to allow discharge belt clearance",
+      "Screen elevated so product belts run downhill to stockpile",
+      "VSI on same platform level as Cone or slightly higher",
+      "Stockpiles at far end from feed pile"
+    ],
+    "confirmed": true
+  },
+  "linear": {
+    "name": "Linear Layout",
+    "description": "All primary equipment in a straight line from feed to product. Suitable for long, narrow plots.",
+    "best_for": "Long narrow sites or where access road runs along one side.",
+    "typical_plot_m": "120 x 25",
+    "arrangement": [
+      {"seq": 1, "equipment": "VGF",    "rel_x": 0.05, "rel_y": 0.50, "is_elevated": false, "feeds_to": "JAW"},
+      {"seq": 2, "equipment": "JAW",    "rel_x": 0.20, "rel_y": 0.50, "is_elevated": false, "feeds_to": "CONE"},
+      {"seq": 3, "equipment": "CONE",   "rel_x": 0.45, "rel_y": 0.50, "is_elevated": true,  "feeds_to": "SCREEN"},
+      {"seq": 4, "equipment": "SCREEN", "rel_x": 0.65, "rel_y": 0.50, "is_elevated": true,  "feeds_to": "VSI or PRODUCTS"},
+      {"seq": 5, "equipment": "VSI",    "rel_x": 0.80, "rel_y": 0.50, "is_elevated": true,  "feeds_to": "PRODUCTS"}
+    ],
+    "rules": [
+      "All equipment on one axis",
+      "Product stockpiles perpendicular to the main line",
+      "Longer conveyor runs — quote belt lengths carefully",
+      "Access road runs parallel along south side"
+    ],
+    "confirmed": false
+  },
+  "l_shape": {
+    "name": "L-Shape Layout",
+    "description": "Primary crushing in one direction, secondary/tertiary at 90°. Compact and flexible.",
+    "best_for": "Square or L-shaped plots. Good when stockpile area is limited on one side.",
+    "typical_plot_m": "50 x 50",
+    "arrangement": [
+      {"seq": 1, "equipment": "VGF",    "rel_x": 0.10, "rel_y": 0.80, "is_elevated": false, "feeds_to": "JAW"},
+      {"seq": 2, "equipment": "JAW",    "rel_x": 0.10, "rel_y": 0.55, "is_elevated": false, "feeds_to": "CONE"},
+      {"seq": 3, "equipment": "CONE",   "rel_x": 0.10, "rel_y": 0.30, "is_elevated": true,  "feeds_to": "SCREEN"},
+      {"seq": 4, "equipment": "SCREEN", "rel_x": 0.40, "rel_y": 0.15, "is_elevated": true,  "feeds_to": "VSI or PRODUCTS"},
+      {"seq": 5, "equipment": "VSI",    "rel_x": 0.65, "rel_y": 0.15, "is_elevated": true,  "feeds_to": "PRODUCTS"}
+    ],
+    "rules": [
+      "Primary section runs north-south (jaw and VGF)",
+      "Secondary/tertiary turns east-west at the screen",
+      "Product stockpiles on east side",
+      "Feed pile access from south"
+    ],
+    "confirmed": false
+  },
+  "custom": {
+    "name": "Custom Layout",
+    "description": "User-defined arrangement. Upload a schematic or define equipment positions manually.",
+    "best_for": "Sites with specific constraints — existing structures, roads, utility lines.",
+    "typical_plot_m": "User defined",
+    "arrangement": [],
+    "rules": ["Engineering review required before finalising"],
+    "confirmed": false,
+    "schematic_url": "",
+    "schematic_notes": "Upload site plan or hand sketch to attach here"
+  }
+}

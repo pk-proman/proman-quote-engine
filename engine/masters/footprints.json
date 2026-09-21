@@ -1,0 +1,136 @@
+{
+  "_meta": {
+    "description": "Equipment footprint dimensions for plant layout generation. All dimensions in metres. Platform height = height of feed point above ground. Weight in tonnes.",
+    "last_updated": "",
+    "updated_by": "",
+    "confirm_note": "Values marked [TBC] are industry approximations — replace with actual PROMAN/OEM drawings"
+  },
+  "VGF": {
+    "1200x4000": {
+      "length_m": 4.8, "width_m": 1.6, "height_m": 1.2,
+      "platform_h": 0.0, "weight_t": 2.0,
+      "feed_h": 1.2, "discharge_h": 0.3,
+      "confirmed": false, "note": "[TBC]"
+    },
+    "1500x5500": {
+      "length_m": 6.2, "width_m": 1.9, "height_m": 1.4,
+      "platform_h": 0.0, "weight_t": 3.2,
+      "feed_h": 1.4, "discharge_h": 0.3,
+      "confirmed": false, "note": "[TBC]"
+    },
+    "1600x6000": {
+      "length_m": 6.8, "width_m": 2.1, "height_m": 1.5,
+      "platform_h": 0.0, "weight_t": 4.0,
+      "feed_h": 1.5, "discharge_h": 0.3,
+      "confirmed": false, "note": "[TBC]"
+    }
+  },
+  "JAW": {
+    "20x12": {
+      "length_m": 2.6, "width_m": 1.8, "height_m": 2.0,
+      "platform_h": 0.0, "weight_t": 7.0,
+      "feed_h": 2.0, "discharge_h": 1.83,
+      "confirmed": false, "note": "[TBC] Discharge default 1.83m (6ft)"
+    },
+    "30x20": {
+      "length_m": 3.4, "width_m": 2.4, "height_m": 2.6,
+      "platform_h": 0.0, "weight_t": 14.0,
+      "feed_h": 2.6, "discharge_h": 1.83,
+      "confirmed": false, "note": "[TBC]"
+    },
+    "42x30": {
+      "length_m": 4.2, "width_m": 3.0, "height_m": 3.2,
+      "platform_h": 0.0, "weight_t": 32.0,
+      "feed_h": 3.2, "discharge_h": 1.83,
+      "confirmed": false, "note": "[TBC]"
+    },
+    "50x40": {
+      "length_m": 5.0, "width_m": 3.6, "height_m": 3.8,
+      "platform_h": 0.0, "weight_t": 55.0,
+      "feed_h": 3.8, "discharge_h": 1.83,
+      "confirmed": false, "note": "[TBC]"
+    }
+  },
+  "CONE": {
+    "2500": {
+      "length_m": 2.8, "width_m": 2.8, "height_m": 2.5,
+      "platform_h": 4.5, "weight_t": 9.0,
+      "feed_h": 1.0, "discharge_h": 0.5,
+      "confirmed": false, "note": "[TBC] Platform height = top of structure the cone sits on"
+    },
+    "3510": {
+      "length_m": 3.4, "width_m": 3.4, "height_m": 3.0,
+      "platform_h": 5.0, "weight_t": 16.0,
+      "feed_h": 1.0, "discharge_h": 0.5,
+      "confirmed": false, "note": "[TBC]"
+    },
+    "4510": {
+      "length_m": 4.0, "width_m": 4.0, "height_m": 3.5,
+      "platform_h": 5.5, "weight_t": 25.0,
+      "feed_h": 1.0, "discharge_h": 0.5,
+      "confirmed": false, "note": "[TBC]"
+    },
+    "H6800": {
+      "length_m": 4.8, "width_m": 4.8, "height_m": 4.2,
+      "platform_h": 6.0, "weight_t": 50.0,
+      "feed_h": 1.0, "discharge_h": 0.5,
+      "confirmed": false, "note": "[TBC] Metso H6800"
+    }
+  },
+  "VSI": {
+    "300": {
+      "length_m": 2.0, "width_m": 2.0, "height_m": 1.8,
+      "platform_h": 5.0, "weight_t": 4.5,
+      "feed_h": 1.8, "discharge_h": 0.3,
+      "confirmed": false, "note": "[TBC] REMCO VSI-300"
+    },
+    "4000": {
+      "length_m": 2.4, "width_m": 2.4, "height_m": 2.2,
+      "platform_h": 5.5, "weight_t": 7.0,
+      "feed_h": 2.2, "discharge_h": 0.3,
+      "confirmed": false, "note": "[TBC] REMCO VSI-4000"
+    },
+    "5080": {
+      "length_m": 2.8, "width_m": 2.8, "height_m": 2.5,
+      "platform_h": 6.0, "weight_t": 10.0,
+      "feed_h": 2.5, "discharge_h": 0.3,
+      "confirmed": false, "note": "[TBC] REMCO VSI-5080"
+    }
+  },
+  "SCREEN": {
+    "1500x4000_2d": {
+      "length_m": 4.8, "width_m": 2.2, "height_m": 1.8,
+      "platform_h": 3.0, "weight_t": 4.5,
+      "feed_h": 1.8, "discharge_h": 0.5,
+      "confirmed": false, "note": "[TBC] 2-deck"
+    },
+    "2000x5000_3d": {
+      "length_m": 5.8, "width_m": 2.8, "height_m": 2.2,
+      "platform_h": 3.5, "weight_t": 7.0,
+      "feed_h": 2.2, "discharge_h": 0.5,
+      "confirmed": false, "note": "[TBC] 3-deck"
+    },
+    "2000x6000_4d": {
+      "length_m": 6.8, "width_m": 2.8, "height_m": 2.4,
+      "platform_h": 4.0, "weight_t": 9.0,
+      "feed_h": 2.4, "discharge_h": 0.5,
+      "confirmed": false, "note": "[TBC] 4-deck"
+    }
+  },
+  "WSG": {
+    "70": {
+      "length_m": 8.0, "width_m": 4.5, "height_m": 5.5,
+      "platform_h": 0.0, "weight_t": 18.0,
+      "feed_h": 5.5, "discharge_h": 0.5,
+      "confirmed": false, "note": "[TBC] ORTNER WSG-70 including sump, pump"
+    }
+  },
+  "MVF": {
+    "100-160": {
+      "length_m": 4.2, "width_m": 1.4, "height_m": 1.0,
+      "platform_h": 0.0, "weight_t": 1.8,
+      "feed_h": 1.0, "discharge_h": 0.4,
+      "confirmed": false, "note": "[TBC]"
+    }
+  }
+}

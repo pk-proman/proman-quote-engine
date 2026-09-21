@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PROMAN — Login</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#0f1117;color:#e2e8f0;font-family:'Segoe UI',sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center}
+  .card{background:#1a1d27;border:1px solid #2a2d3e;border-radius:14px;padding:40px 36px;width:100%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+  .logo{text-align:center;margin-bottom:28px}
+  .logo h1{font-size:22px;font-weight:800;color:#f97316;letter-spacing:.5px}
+  .logo p{font-size:12px;color:#94a3b8;margin-top:4px}
+  .form-group{margin-bottom:16px}
+  label{display:block;font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+  input{width:100%;background:#252836;border:1px solid #2a2d3e;border-radius:8px;color:#e2e8f0;padding:11px 14px;font-size:14px;transition:.15s}
+  input:focus{outline:none;border-color:#f97316;background:#2a2d3e}
+  .btn{width:100%;background:#f97316;color:#fff;border:none;border-radius:8px;padding:12px;font-size:15px;font-weight:700;cursor:pointer;margin-top:8px;transition:.15s}
+  .btn:hover{background:#ea6c0a}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .error{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);border-radius:7px;padding:10px 14px;font-size:13px;color:#f87171;margin-bottom:14px;display:none}
+  .warning{background:rgba(234,179,8,.1);border:1px solid rgba(234,179,8,.3);border-radius:7px;padding:10px 14px;font-size:12px;color:#fbbf24;margin-top:16px;text-align:center}
+  .spinner{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <h1>PROMAN</h1>
+    <p>Quotation Engine &amp; Admin Portal</p>
+  </div>
+  <div class="error" id="err"></div>
+  <form onsubmit="doLogin(event)">
+    <div class="form-group">
+      <label>Username</label>
+      <input id="username" type="text" autocomplete="username" placeholder="Enter username" required autofocus>
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input id="password" type="password" autocomplete="current-password" placeholder="Enter password" required>
+    </div>
+    <button class="btn" type="submit" id="btn">Sign In</button>
+  </form>
+  <div class="warning" id="pw-warning" style="display:none">
+    ⚠️ You are using the default password. Please change it after logging in.
+  </div>
+</div>
+<script>
+async function doLogin(e) {
+  e.preventDefault();
+  const btn = document.getElementById('btn');
+  const err = document.getElementById('err');
+  err.style.display = 'none';
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Signing in…';
+  try {
+    const r = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        username: document.getElementById('username').value,
+        password: document.getElementById('password').value,
+      })
+    });
+    // Safely parse — server might return plain-text 500 if a package is missing
+    const text = await r.text();
+    let data;
+    try { data = JSON.parse(text); }
+    catch { throw new Error('Server error: ' + text.substring(0, 120)); }
+    if (!r.ok) { throw new Error(data.detail || 'Login failed'); }
+    if (data.must_change_password) {
+      document.getElementById('pw-warning').style.display = 'block';
+      setTimeout(() => { window.location.href = data.redirect || '/'; }, 1800);
+    } else {
+      window.location.href = data.redirect || '/';
+    }
+  } catch(ex) {
+    err.textContent = ex.message;
+    err.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Sign In';
+  }
+}
+</script>
+</body>
+</html>

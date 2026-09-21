@@ -1,0 +1,57 @@
+{
+  "_meta": {
+    "description": "Global quotation engine parameters. These control pricing logic, inclusions, and output formatting.",
+    "last_updated": "",
+    "updated_by": ""
+  },
+  "pricing": {
+    "chutes_pct_of_sub_b": 8.0,
+    "chutes_pct_note": "Chutes & supports = X% of total conveyor cost (Sub B). Confirm with actual job history.",
+    "structural_rate_per_ton": 115000,
+    "sheet_metal_rate_per_ton": 120000,
+    "structural_rate_note": "₹/ton for structural steel and sheet metal (2025-26 rates). Update annually.",
+    "gst_rate_pct": 18.0,
+    "show_gst_in_quote": false,
+    "show_gst_note": "Set true to show GST line in offer letters. Client usually handles GST separately.",
+    "freight_rate_per_km": 0,
+    "freight_note": "₹ per km per equipment piece. Set 0 if freight is always 'extra at actuals'.",
+    "foundation_excluded": true,
+    "foundation_note": "Foundation cost is always excluded from PROMAN scope (civil contractor).",
+    "erection_inclusions": "Supply of erection crew, tools, and supervision. Excludes crane hire unless stated.",
+    "transportation_note": "Transportation extra at actuals unless quoted as lump sum."
+  },
+  "commercial": {
+    "payment_terms": "30% advance with order, 60% before dispatch, 10% within 30 days of commissioning",
+    "warranty_months": 12,
+    "warranty_note": "12 months from date of commissioning or 18 months from date of dispatch, whichever is earlier.",
+    "delivery_weeks_2stage": 16,
+    "delivery_weeks_3stage": 20,
+    "delivery_weeks_4stage": 26,
+    "delivery_note": "Delivery period from receipt of advance and drawings approval.",
+    "quote_validity_days": 30,
+    "quote_validity_note": "Quotation validity in days from date of issue."
+  },
+  "layout": {
+    "default_min_clearance_m": 1.5,
+    "default_aisle_width_m": 3.0,
+    "default_conveyor_angle_deg": 18,
+    "jaw_discharge_default_m": 1.83,
+    "platform_safety_railing_h": 1.05,
+    "default_layout_style": "cascade",
+    "layout_style_note": "cascade | linear | l_shape"
+  },
+  "quotation_output": {
+    "company_name": "PROMAN Infrastructure Services Pvt. Ltd.",
+    "company_address": "[Enter company address]",
+    "company_phone": "[Enter phone]",
+    "company_email": "[Enter email]",
+    "company_gst": "[Enter GST number]",
+    "logo_path": "static/logo.png",
+    "ref_prefix": "PR",
+    "currency_symbol": "₹",
+    "price_unit": "Lakhs",
+    "show_best_price": true,
+    "show_list_price": true,
+    "annexure_note": "Prices are in Indian Rupees (₹) in Lakhs ex-works Pune, exclusive of GST, freight, insurance, and foundation."
+  }
+}

@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PROMAN Masters — Admin Panel</title>
+<style>
+  :root{--bg:#0f1117;--card:#1a1d27;--border:#2a2d3e;--accent:#f97316;--accent2:#3b82f6;--green:#22c55e;--yellow:#eab308;--red:#ef4444;--text:#e2e8f0;--muted:#94a3b8;--input:#252836}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;display:flex;min-height:100vh}
+  /* SIDEBAR */
+  .sidebar{width:220px;background:var(--card);border-right:1px solid var(--border);padding:0;position:fixed;height:100vh;overflow-y:auto;z-index:10}
+  .sidebar-header{padding:18px 16px 14px;border-bottom:1px solid var(--border)}
+  .sidebar-header h1{font-size:13px;font-weight:700;color:var(--accent);letter-spacing:.5px;text-transform:uppercase}
+  .sidebar-header p{font-size:11px;color:var(--muted);margin-top:3px}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:11px 16px;cursor:pointer;font-size:13px;color:var(--muted);border-left:3px solid transparent;transition:.15s}
+  .nav-item:hover{background:rgba(249,115,22,.07);color:var(--text)}
+  .nav-item.active{color:var(--accent);border-left-color:var(--accent);background:rgba(249,115,22,.1)}
+  .nav-icon{font-size:16px;width:20px;text-align:center}
+  /* MAIN */
+  .main{margin-left:220px;flex:1;padding:24px;min-height:100vh}
+  .page{display:none}.page.active{display:block}
+  .page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+  .page-header h2{font-size:18px;font-weight:700}
+  .page-header p{font-size:13px;color:var(--muted);margin-top:3px}
+  /* BUTTONS */
+  .btn{padding:8px 16px;border-radius:6px;font-size:13px;cursor:pointer;border:none;font-weight:600;transition:.15s}
+  .btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{opacity:.88}
+  .btn-success{background:var(--green);color:#fff}.btn-success:hover{opacity:.88}
+  .btn-sm{padding:4px 10px;font-size:12px}
+  .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--muted)}.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+  .btn-danger{background:var(--red);color:#fff}.btn-danger:hover{opacity:.88}
+  /* CARDS */
+  .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:18px}
+  .card-title{font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  /* TABLE */
+  .tbl-wrap{overflow-x:auto;border-radius:8px;border:1px solid var(--border)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{background:#1e2133;padding:10px 12px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);white-space:nowrap;position:sticky;top:0}
+  td{padding:9px 12px;border-top:1px solid var(--border);vertical-align:middle}
+  tr:hover td{background:rgba(255,255,255,.03)}
+  .badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600}
+  .badge-green{background:rgba(34,197,94,.15);color:var(--green)}
+  .badge-yellow{background:rgba(234,179,8,.15);color:var(--yellow)}
+  .badge-red{background:rgba(239,68,68,.15);color:var(--red)}
+  .badge-blue{background:rgba(59,130,246,.15);color:var(--accent2)}
+  /* EDITABLE */
+  .editable{background:transparent;border:1px solid transparent;border-radius:4px;color:var(--text);padding:3px 6px;font-size:13px;width:100%;min-width:60px}
+  .editable:focus{outline:none;border-color:var(--accent);background:var(--input)}
+  select.editable{cursor:pointer}
+  textarea.editable{resize:vertical;min-height:50px}
+  /* FORM GRID */
+  .form-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin-top:12px}
+  .form-group label{display:block;font-size:11px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px}
+  .form-group input,.form-group select,.form-group textarea{width:100%;background:var(--input);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px 10px;font-size:13px}
+  .form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:var(--accent)}
+  .form-group textarea{resize:vertical;min-height:70px}
+  /* TOAST */
+  #toast{position:fixed;bottom:24px;right:24px;background:#1e2133;border:1px solid var(--border);border-radius:8px;padding:12px 18px;font-size:13px;z-index:9999;display:none;box-shadow:0 4px 20px rgba(0,0,0,.4)}
+  #toast.show{display:flex;align-items:center;gap:10px}
+  #toast.success{border-color:var(--green);color:var(--green)}
+  #toast.error{border-color:var(--red);color:var(--red)}
+  /* LAYOUT CANVAS */
+  #layout-canvas{border:1px solid var(--border);border-radius:8px;background:#12151f;width:100%;height:380px}
+  /* TOOLBAR */
+  .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+  /* STATUS BAR */
+  .status-bar{font-size:11px;color:var(--muted);padding:6px 0;display:flex;gap:16px}
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:4px}
+  .dot-green{background:var(--green)}.dot-yellow{background:var(--yellow)}.dot-red{background:var(--red)}
+  /* CONFIRM badge overlay */
+  .tbc{color:var(--yellow);font-size:11px}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="sidebar-header">
+    <h1>PROMAN</h1>
+    <p>Masters Admin Panel</p>
+  </div>
+  <div class="nav-item active" onclick="showPage('stages')" id="nav-stages">
+    <span class="nav-icon">🏗️</span> Stage Specs
+  </div>
+  <div class="nav-item" onclick="showPage('footprints')" id="nav-footprints">
+    <span class="nav-icon">📐</span> Equipment Footprints
+  </div>
+  <div class="nav-item" onclick="showPage('materials')" id="nav-materials">
+    <span class="nav-icon">🪨</span> Materials
+  </div>
+  <div class="nav-item" onclick="showPage('gradations')" id="nav-gradations">
+    <span class="nav-icon">📊</span> Product Gradations
+  </div>
+  <div class="nav-item" onclick="showPage('engine_config')" id="nav-engine_config">
+    <span class="nav-icon">⚙️</span> Engine Config
+  </div>
+  <div class="nav-item" onclick="showPage('layout_templates')" id="nav-layout_templates">
+    <span class="nav-icon">🗺️</span> Layout Templates
+  </div>
+  <div style="border-top:1px solid var(--border);margin-top:auto;padding:14px 16px">
+    <a href="/" style="color:var(--muted);font-size:12px;text-decoration:none">← Back to Quotation Engine</a>
+  </div>
+</nav>
+
+<!-- MAIN -->
+<main class="main">
+
+  <!-- ═══════════════ STAGES ═══════════════ -->
+  <div class="page active" id="page-stages">
+    <div class="page-header">
+      <div><h2>🏗️ Stage Specifications</h2><p>Define equipment, erection cost, and electrical for 1–4 stage plants</p></div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-primary" onclick="saveStages()">💾 Save All Stages</button>
+      </div>
+    </div>
+    <div id="stages-container"></div>
+  </div>
+
+  <!-- ═══════════════ FOOTPRINTS ═══════════════ -->
+  <div class="page" id="page-footprints">
+    <div class="page-header">
+      <div><h2>📐 Equipment Footprint Dimensions</h2><p>Physical dimensions for plant layout generation. All in metres.</p></div>
+      <div style="display:flex;gap:10px">
+        <select id="fp-cat-filter" class="btn btn-ghost" onchange="filterFootprints()" style="padding:8px 12px;font-size:13px">
+          <option value="">All Categories</option>
+          <option>VGF</option><option>JAW</option><option>CONE</option>
+          <option>VSI</option><option>SCREEN</option><option>WSG</option><option>MVF</option>
+        </select>
+        <button class="btn btn-primary" onclick="saveFootprints()">💾 Save Footprints</button>
+        <button class="btn btn-ghost" onclick="addFootprintRow()">+ Add Row</button>
+      </div>
+    </div>
+    <div class="status-bar" id="fp-status"></div>
+    <div class="tbl-wrap">
+      <table id="fp-table">
+        <thead><tr>
+          <th>Category</th><th>Model</th><th>Length (m)</th><th>Width (m)</th>
+          <th>Height (m)</th><th>Platform H (m)</th><th>Weight (t)</th>
+          <th>Feed H (m)</th><th>Discharge H (m)</th><th>Confirmed</th><th>Note</th><th></th>
+        </tr></thead>
+        <tbody id="fp-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══════════════ MATERIALS ═══════════════ -->
+  <div class="page" id="page-materials">
+    <div class="page-header">
+      <div><h2>🪨 Materials Master</h2><p>Material properties, capacity factors, liner recommendations</p></div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-primary" onclick="saveMaterials()">💾 Save Materials</button>
+        <button class="btn btn-ghost" onclick="addMaterialRow()">+ Add Material</button>
+      </div>
+    </div>
+    <div class="tbl-wrap">
+      <table id="mat-table">
+        <thead><tr>
+          <th>Material</th><th>Category</th><th>Mohs Min</th><th>Mohs Max</th>
+          <th>Bulk Density</th><th>Abrasion</th><th>Capacity Factor</th>
+          <th>BWI</th><th>Jaw Liner</th><th>Max Feed (mm)</th>
+          <th>PROMAN</th><th>Confirmed</th><th>Notes</th><th></th>
+        </tr></thead>
+        <tbody id="mat-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══════════════ GRADATIONS ═══════════════ -->
+  <div class="page" id="page-gradations">
+    <div class="page-header">
+      <div><h2>📊 Product Gradations</h2><p>IS / MORTH output product specifications built into the engine</p></div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-primary" onclick="saveGradations()">💾 Save Gradations</button>
+        <button class="btn btn-ghost" onclick="addGradationCard()">+ Add Product</button>
+      </div>
+    </div>
+    <div id="grad-container"></div>
+  </div>
+
+  <!-- ═══════════════ ENGINE CONFIG ═══════════════ -->
+  <div class="page" id="page-engine_config">
+    <div class="page-header">
+      <div><h2>⚙️ Engine Configuration</h2><p>Global quotation engine parameters — pricing, commercial terms, output formatting</p></div>
+      <button class="btn btn-primary" onclick="saveEngineConfig()">💾 Save Config</button>
+    </div>
+    <div id="cfg-container"></div>
+  </div>
+
+  <!-- ═══════════════ LAYOUT TEMPLATES ═══════════════ -->
+  <div class="page" id="page-layout_templates">
+    <div class="page-header">
+      <div><h2>🗺️ Layout Templates</h2><p>Standard plant arrangement templates and rules</p></div>
+      <button class="btn btn-primary" onclick="saveLayouts()">💾 Save Templates</button>
+    </div>
+    <div id="layout-container"></div>
+    <div class="card" style="margin-top:18px">
+      <div class="card-title">🖼️ Layout Preview</div>
+      <div class="toolbar">
+        <select id="preview-template" onchange="renderLayoutPreview()" style="background:var(--input);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px;font-size:13px">
+          <option value="cascade">Cascade</option>
+          <option value="linear">Linear</option>
+          <option value="l_shape">L-Shape</option>
+        </select>
+        <select id="preview-stages" onchange="renderLayoutPreview()" style="background:var(--input);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px;font-size:13px">
+          <option value="2">2-Stage</option>
+          <option value="3" selected>3-Stage</option>
+          <option value="4">4-Stage</option>
+        </select>
+        <input id="plot-w" type="number" value="100" min="20" max="300" placeholder="Plot W (ft)" style="width:100px;background:var(--input);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px;font-size:13px" onchange="renderLayoutPreview()">
+        <input id="plot-h" type="number" value="60" min="20" max="200" placeholder="Plot H (ft)" style="width:100px;background:var(--input);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px;font-size:13px" onchange="renderLayoutPreview()">
+        <label style="font-size:12px;color:var(--muted)">ft</label>
+      </div>
+      <canvas id="layout-canvas"></canvas>
+    </div>
+  </div>
+
+</main>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+const API = '';
+let mastersData = {};
+
+// ─── NAVIGATION ──────────────────────────────────────────────────────────────
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.getElementById('nav-' + name).classList.add('active');
+}
+
+// ─── TOAST ───────────────────────────────────────────────────────────────────
+function toast(msg, type='success') {
+  const el = document.getElementById('toast');
+  el.textContent = (type==='success'?'✅ ':'❌ ') + msg;
+  el.className = 'show ' + type;
+  setTimeout(() => el.className='', 3000);
+}
+
+// ─── API HELPERS ─────────────────────────────────────────────────────────────
+async function fetchMaster(name) {
+  const r = await fetch(`${API}/api/masters/${name}`);
+  return r.json();
+}
+async function putMaster(name, data) {
+  const r = await fetch(`${API}/api/masters/${name}`, {
+    method:'PUT',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({data, updated_by:'admin'})
+  });
+  if(!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+async function init() {
+  const names = ['stages','footprints','materials','gradations','engine_config','layout_templates'];
+  for(const n of names) mastersData[n] = await fetchMaster(n);
+  renderStages();
+  renderFootprints();
+  renderMaterials();
+  renderGradations();
+  renderEngineConfig();
+  renderLayouts();
+  renderLayoutPreview();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// STAGES
+// ══════════════════════════════════════════════════════════════════════════════
+function renderStages() {
+  const data = mastersData.stages;
+  const container = document.getElementById('stages-container');
+  container.innerHTML = '';
+  for(const [key, s] of Object.entries(data)) {
+    if(key.startsWith('_')) continue;
+    container.innerHTML += `
+    <div class="card" id="stage-card-${key}">
+      <div class="card-title">Stage ${key}: ${s.name||''}</div>
+      <div class="form-grid">
+        <div class="form-group"><label>Stage Name</label>
+          <input data-stage="${key}" data-field="name" value="${s.name||''}" oninput="updateStage(this)"></div>
+        <div class="form-group"><label>Description</label>
+          <textarea data-stage="${key}" data-field="description" oninput="updateStage(this)">${s.description||''}</textarea></div>
+        <div class="form-group"><label>TPH Min</label>
+          <input type="number" data-stage="${key}" data-field="tph_min" value="${(s.tph_range||[0])[0]||0}" oninput="updateStageTPH(this,'min')"></div>
+        <div class="form-group"><label>TPH Max</label>
+          <input type="number" data-stage="${key}" data-field="tph_max" value="${(s.tph_range||[0,0])[1]||0}" oninput="updateStageTPH(this,'max')"></div>
+        <div class="form-group"><label>Erection Lump (₹L)</label>
+          <input type="number" step="0.5" data-stage="${key}" data-field="erection_lump" value="${s.erection_lump||0}" oninput="updateStage(this)"></div>
+        <div class="form-group"><label>Erection Portable (₹L)</label>
+          <input type="number" step="0.5" data-stage="${key}" data-field="erection_portable_lump" value="${s.erection_portable_lump||''}" placeholder="N/A" oninput="updateStage(this)"></div>
+        <div class="form-group"><label>Electrical Base (₹L)</label>
+          <input type="number" step="1" data-stage="${key}" data-field="electrical_base" value="${s.electrical_base||0}" oninput="updateStage(this)"></div>
+        <div class="form-group"><label>Electrical Note</label>
+          <input data-stage="${key}" data-field="electrical_note" value="${s.electrical_note||''}" oninput="updateStage(this)"></div>
+        <div class="form-group"><label>Structural Steel (ton approx)</label>
+          <input type="number" data-stage="${key}" data-field="structural_ton_approx" value="${s.structural_ton_approx||0}" oninput="updateStage(this)"></div>
+        <div class="form-group"><label>Approx Conveyor Count</label>
+          <input type="number" data-stage="${key}" data-field="conveyor_count_approx" value="${s.conveyor_count_approx||0}" oninput="updateStage(this)"></div>
+        <div class="form-group"><label>Typical Products (comma separated)</label>
+          <input data-stage="${key}" data-field="typical_products_str" value="${(s.typical_products||[]).join(', ')}" oninput="updateStageProducts(this)"></div>
+        <div class="form-group"><label>Engineering Notes</label>
+          <textarea data-stage="${key}" data-field="notes" oninput="updateStage(this)">${s.notes||''}</textarea></div>
+      </div>
+    </div>`;
+  }
+}
+
+function updateStage(el) {
+  const k = el.dataset.stage, f = el.dataset.field;
+  mastersData.stages[k][f] = el.value;
+}
+function updateStageTPH(el, which) {
+  const k = el.dataset.stage;
+  if(!mastersData.stages[k].tph_range) mastersData.stages[k].tph_range=[0,0];
+  mastersData.stages[k].tph_range[which==='min'?0:1] = +el.value;
+}
+function updateStageProducts(el) {
+  const k = el.dataset.stage;
+  mastersData.stages[k].typical_products = el.value.split(',').map(s=>s.trim()).filter(Boolean);
+}
+async function saveStages() {
+  try { await putMaster('stages', mastersData.stages); toast('Stages saved'); }
+  catch(e){ toast(e.message,'error'); }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// FOOTPRINTS
+// ══════════════════════════════════════════════════════════════════════════════
+let fpRows = [];
+
+function renderFootprints() {
+  const data = mastersData.footprints;
+  fpRows = [];
+  for(const [cat, models] of Object.entries(data)) {
+    if(cat.startsWith('_')) continue;
+    for(const [model, dims] of Object.entries(models)) {
+      fpRows.push({category:cat, model, ...dims});
+    }
+  }
+  renderFPTable();
+  updateFPStatus();
+}
+
+function renderFPTable(filter='') {
+  const tbody = document.getElementById('fp-tbody');
+  tbody.innerHTML = '';
+  fpRows.filter(r => !filter || r.category===filter).forEach((r,i) => {
+    const confirmed = r.confirmed ? `<span class="badge badge-green">✓</span>` : `<span class="badge badge-yellow">TBC</span>`;
+    tbody.innerHTML += `<tr data-idx="${i}">
+      <td><input class="editable" style="width:70px" value="${r.category}" onchange="updateFP(${i},'category',this.value)"></td>
+      <td><input class="editable" style="width:90px" value="${r.model}" onchange="updateFP(${i},'model',this.value)"></td>
+      <td><input class="editable" type="number" step="0.1" value="${r.length_m||''}" onchange="updateFP(${i},'length_m',+this.value)"></td>
+      <td><input class="editable" type="number" step="0.1" value="${r.width_m||''}" onchange="updateFP(${i},'width_m',+this.value)"></td>
+      <td><input class="editable" type="number" step="0.1" value="${r.height_m||''}" onchange="updateFP(${i},'height_m',+this.value)"></td>
+      <td><input class="editable" type="number" step="0.5" value="${r.platform_h||0}" onchange="updateFP(${i},'platform_h',+this.value)"></td>
+      <td><input class="editable" type="number" step="0.5" value="${r.weight_t||''}" onchange="updateFP(${i},'weight_t',+this.value)"></td>
+      <td><input class="editable" type="number" step="0.1" value="${r.feed_h||''}" onchange="updateFP(${i},'feed_h',+this.value)"></td>
+      <td><input class="editable" type="number" step="0.1" value="${r.discharge_h||''}" onchange="updateFP(${i},'discharge_h',+this.value)"></td>
+      <td><input type="checkbox" ${r.confirmed?'checked':''} onchange="updateFP(${i},'confirmed',this.checked)" style="width:16px;height:16px;cursor:pointer"></td>
+      <td><input class="editable" style="min-width:120px" value="${r.note||''}" onchange="updateFP(${i},'note',this.value)"></td>
+      <td><button class="btn btn-danger btn-sm" onclick="deleteFP(${i})">✕</button></td>
+    </tr>`;
+  });
+}
+
+function updateFP(i, field, val) { fpRows[i][field] = val; updateFPStatus(); }
+function deleteFP(i) { fpRows.splice(i,1); renderFPTable(); updateFPStatus(); }
+function filterFootprints() { renderFPTable(document.getElementById('fp-cat-filter').value); }
+
+function addFootprintRow() {
+  fpRows.push({category:'JAW',model:'new',length_m:0,width_m:0,height_m:0,platform_h:0,weight_t:0,feed_h:0,discharge_h:0,confirmed:false,note:'[TBC]'});
+  renderFPTable();
+}
+
+function updateFPStatus() {
+  const total = fpRows.length, tbc = fpRows.filter(r=>!r.confirmed).length;
+  document.getElementById('fp-status').innerHTML = `
+    <span><span class="dot dot-green"></span>${total-tbc} confirmed</span>
+    <span><span class="dot dot-yellow"></span>${tbc} awaiting confirmation</span>`;
+}
+
+async function saveFootprints() {
+  // Rebuild nested structure
+  const rebuilt = {'_meta': mastersData.footprints._meta || {}};
+  for(const r of fpRows) {
+    const {category, model, ...dims} = r;
+    if(!rebuilt[category]) rebuilt[category] = {};
+    rebuilt[category][model] = dims;
+  }
+  mastersData.footprints = rebuilt;
+  try { await putMaster('footprints', rebuilt); toast('Footprints saved'); }
+  catch(e){ toast(e.message,'error'); }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MATERIALS
+// ══════════════════════════════════════════════════════════════════════════════
+let matRows = [];
+
+function renderMaterials() {
+  const data = mastersData.materials;
+  matRows = [];
+  for(const [name, props] of Object.entries(data)) {
+    if(name.startsWith('_')) continue;
+    matRows.push({name, ...props});
+  }
+  renderMatTable();
+}
+
+function renderMatTable() {
+  const tbody = document.getElementById('mat-tbody');
+  tbody.innerHTML = '';
+  matRows.forEach((r,i) => {
+    const cats = ['Hard Rock','Soft Rock','Soft-Medium Rock','Mineral / Industrial','Mineral Ore','Recycled / C&D Waste'];
+    const catOpts = cats.map(c=>`<option ${c===r.category?'selected':''}>${c}</option>`).join('');
+    const abOpts = ['Low','Medium','High','Very High'].map(a=>`<option ${a===r.abrasion?'selected':''}>${a}</option>`).join('');
+    const liners = ['Mn13','Mn18','Mn22'].map(l=>`<option ${l===r.jaw_liner?'selected':''}>${l}</option>`).join('');
+    tbody.innerHTML += `<tr>
+      <td><input class="editable" value="${r.name}" onchange="updateMat(${i},'name',this.value)" style="min-width:130px"></td>
+      <td><select class="editable" onchange="updateMat(${i},'category',this.value)">${catOpts}</select></td>
+      <td><input class="editable" type="number" step="0.5" value="${r.mohs_min||''}" onchange="updateMat(${i},'mohs_min',+this.value)"></td>
+      <td><input class="editable" type="number" step="0.5" value="${r.mohs_max||''}" onchange="updateMat(${i},'mohs_max',+this.value)"></td>
+      <td><input class="editable" type="number" step="0.01" value="${r.bulk_density_tm3||''}" onchange="updateMat(${i},'bulk_density_tm3',+this.value)"></td>
+      <td><select class="editable" onchange="updateMat(${i},'abrasion',this.value)">${abOpts}</select></td>
+      <td><input class="editable" type="number" step="0.01" value="${r.capacity_factor||1}" onchange="updateMat(${i},'capacity_factor',+this.value)"></td>
+      <td><input class="editable" type="number" step="0.1" value="${r.bond_work_index||''}" onchange="updateMat(${i},'bond_work_index',+this.value)"></td>
+      <td><select class="editable" onchange="updateMat(${i},'jaw_liner',this.value)">${liners}</select></td>
+      <td><input class="editable" type="number" value="${r.max_feed_mm||''}" onchange="updateMat(${i},'max_feed_mm',+this.value)"></td>
+      <td><input type="checkbox" ${r.proman_processed?'checked':''} onchange="updateMat(${i},'proman_processed',this.checked)" style="width:16px;height:16px;cursor:pointer"></td>
+      <td><input type="checkbox" ${r.confirmed?'checked':''} onchange="updateMat(${i},'confirmed',this.checked)" style="width:16px;height:16px;cursor:pointer"></td>
+      <td><textarea class="editable" style="min-width:160px;height:50px" onchange="updateMat(${i},'special_notes',this.value)">${r.special_notes||''}</textarea></td>
+      <td><button class="btn btn-danger btn-sm" onclick="deleteMat(${i})">✕</button></td>
+    </tr>`;
+  });
+}
+
+function updateMat(i, f, v) { matRows[i][f] = v; }
+function deleteMat(i) { matRows.splice(i,1); renderMatTable(); }
+function addMaterialRow() {
+  matRows.push({name:'New Material',category:'Hard Rock',mohs_min:5,mohs_max:7,bulk_density_tm3:1.55,abrasion:'High',capacity_factor:1.0,bond_work_index:14,jaw_liner:'Mn18',max_feed_mm:800,proman_processed:false,confirmed:false,special_notes:'[TBC]'});
+  renderMatTable();
+}
+async function saveMaterials() {
+  const rebuilt = {'_meta': mastersData.materials._meta || {}};
+  for(const r of matRows) {
+    const {name, ...props} = r;
+    rebuilt[name] = props;
+  }
+  mastersData.materials = rebuilt;
+  try { await putMaster('materials', rebuilt); toast('Materials saved'); }
+  catch(e){ toast(e.message,'error'); }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// GRADATIONS
+// ══════════════════════════════════════════════════════════════════════════════
+function renderGradations() {
+  const data = mastersData.gradations;
+  const container = document.getElementById('grad-container');
+  container.innerHTML = '';
+  for(const [key, g] of Object.entries(data)) {
+    if(key.startsWith('_')) continue;
+    const sieves = (g.sieve_mm||[]).join(', ');
+    const mn = (g.passing_min_pct||[]).join(', ');
+    const mx = (g.passing_max_pct||[]).join(', ');
+    container.innerHTML += `
+    <div class="card" id="grad-${key}">
+      <div class="card-title">${key}: ${g.full_name||''}</div>
+      <div class="form-grid">
+        <div class="form-group"><label>Product Key</label><input id="gk-${key}" value="${key}" style="background:var(--input);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px;font-size:13px;width:100%"></div>
+        <div class="form-group"><label>Full Name</label><input id="gn-${key}" value="${g.full_name||''}" style="background:var(--input);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px;font-size:13px;width:100%"></div>
+        <div class="form-group"><label>Standard</label><input id="gs-${key}" value="${g.standard||''}" style="background:var(--input);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px;font-size:13px;width:100%"></div>
+        <div class="form-group"><label>Application</label><input id="ga-${key}" value="${g.application||''}" style="background:var(--input);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px;font-size:13px;width:100%"></div>
+        <div class="form-group"><label>Max Size (mm)</label><input type="number" id="gmax-${key}" value="${g.max_size_mm||''}" style="background:var(--input);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px;font-size:13px;width:100%"></div>
+        <div class="form-group"><label>Crusher Output</label><input id="gco-${key}" value="${g.typical_crusher_output||''}" style="background:var(--input);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px;font-size:13px;width:100%"></div>
+        <div class="form-group" style="grid-column:1/-1"><label>Sieve Sizes (mm, comma separated)</label>
+          <input id="gsv-${key}" value="${sieves}" style="background:var(--input);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px;font-size:13px;width:100%"></div>
+        <div class="form-group" style="grid-column:1/-1"><label>Min % Passing (matching order)</label>
+          <input id="gmn-${key}" value="${mn}" style="background:var(--input);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px;font-size:13px;width:100%"></div>
+        <div class="form-group" style="grid-column:1/-1"><label>Max % Passing (matching order)</label>
+          <input id="gmx-${key}" value="${mx}" style="background:var(--input);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px;font-size:13px;width:100%"></div>
+        <div class="form-group" style="grid-column:1/-1"><label>Notes</label>
+          <textarea id="gnt-${key}" style="background:var(--input);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px;font-size:13px;width:100%;resize:vertical;min-height:55px">${g.notes||''}</textarea></div>
+      </div>
+    </div>`;
+  }
+}
+
+async function saveGradations() {
+  const data = mastersData.gradations;
+  const rebuilt = {'_meta': data._meta || {}};
+  for(const key of Object.keys(data)) {
+    if(key.startsWith('_')) continue;
+    const newKey = document.getElementById(`gk-${key}`)?.value || key;
+    rebuilt[newKey] = {
+      full_name: document.getElementById(`gn-${key}`)?.value || '',
+      standard:  document.getElementById(`gs-${key}`)?.value || '',
+      application: document.getElementById(`ga-${key}`)?.value || '',
+      max_size_mm: +(document.getElementById(`gmax-${key}`)?.value||0),
+      typical_crusher_output: document.getElementById(`gco-${key}`)?.value || '',
+      sieve_mm: (document.getElementById(`gsv-${key}`)?.value||'').split(',').map(s=>+s.trim()).filter(Boolean),
+      passing_min_pct: (document.getElementById(`gmn-${key}`)?.value||'').split(',').map(s=>+s.trim()),
+      passing_max_pct: (document.getElementById(`gmx-${key}`)?.value||'').split(',').map(s=>+s.trim()),
+      notes: document.getElementById(`gnt-${key}`)?.value || '',
+    };
+  }
+  mastersData.gradations = rebuilt;
+  try { await putMaster('gradations', rebuilt); toast('Gradations saved'); }
+  catch(e){ toast(e.message,'error'); }
+}
+
+function addGradationCard() {
+  const key = 'NewProduct_' + Date.now();
+  mastersData.gradations[key] = {full_name:'New Product',standard:'',application:'',max_size_mm:0,typical_crusher_output:'',sieve_mm:[],passing_min_pct:[],passing_max_pct:[],notes:'[TBC]'};
+  renderGradations();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ENGINE CONFIG
+// ══════════════════════════════════════════════════════════════════════════════
+function renderEngineConfig() {
+  const data = mastersData.engine_config;
+  const container = document.getElementById('cfg-container');
+  container.innerHTML = '';
+  for(const [section, fields] of Object.entries(data)) {
+    if(section.startsWith('_')) continue;
+    let rows = '';
+    for(const [field, val] of Object.entries(fields)) {
+      const id = `cfg-${section}-${field}`;
+      const isNote = field.endsWith('_note');
+      const type = typeof val === 'boolean' ? 'checkbox' : typeof val === 'number' ? 'number' : 'text';
+      let input;
+      if(type==='checkbox') input = `<input type="checkbox" id="${id}" ${val?'checked':''} onchange="updateCfg('${section}','${field}',this.checked)" style="width:18px;height:18px;cursor:pointer">`;
+      else if(isNote) input = `<textarea id="${id}" onchange="updateCfg('${section}','${field}',this.value)" style="background:var(--input);border:1px solid var(--border);color:var(--muted);padding:6px 8px;border-radius:5px;font-size:12px;width:100%;resize:vertical;min-height:48px">${val}</textarea>`;
+      else input = `<input type="${type}" id="${id}" step="any" value="${val}" onchange="updateCfg('${section}','${field}',${type==='number'?'+':''}this.value)" style="background:var(--input);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px;font-size:13px;width:100%">`;
+      rows += `<div class="form-group"><label>${field.replace(/_/g,' ')}</label>${input}</div>`;
+    }
+    container.innerHTML += `<div class="card"><div class="card-title">${section.replace(/_/g,' ')}</div><div class="form-grid">${rows}</div></div>`;
+  }
+}
+
+function updateCfg(section, field, val) { mastersData.engine_config[section][field] = val; }
+async function saveEngineConfig() {
+  try { await putMaster('engine_config', mastersData.engine_config); toast('Engine config saved'); }
+  catch(e){ toast(e.message,'error'); }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// LAYOUT TEMPLATES
+// ══════════════════════════════════════════════════════════════════════════════
+function renderLayouts() {
+  const data = mastersData.layout_templates;
+  const container = document.getElementById('layout-container');
+  container.innerHTML = '';
+  for(const [key, t] of Object.entries(data)) {
+    if(key.startsWith('_')) continue;
+    const rules = (t.rules||[]).map((r,i)=>`
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+        <input style="flex:1;background:var(--input);border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:5px;font-size:12px"
+          value="${r}" onchange="updateLayoutRule('${key}',${i},this.value)">
+        <button class="btn btn-danger btn-sm" onclick="deleteLayoutRule('${key}',${i})">✕</button>
+      </div>`).join('');
+    container.innerHTML += `
+    <div class="card">
+      <div class="card-title">${key}: ${t.name||''}
+        ${t.confirmed?'<span class="badge badge-green">Confirmed</span>':'<span class="badge badge-yellow">TBC</span>'}
+      </div>
+      <div class="form-grid">
+        <div class="form-group"><label>Template Name</label>
+          <input id="lt-name-${key}" value="${t.name||''}" style="background:var(--input);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px;font-size:13px;width:100%"></div>
+        <div class="form-group"><label>Description</label>
+          <textarea id="lt-desc-${key}" style="background:var(--input);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px;font-size:13px;width:100%;resize:vertical;min-height:60px">${t.description||''}</textarea></div>
+        <div class="form-group"><label>Best For</label>
+          <input id="lt-bf-${key}" value="${t.best_for||''}" style="background:var(--input);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px;font-size:13px;width:100%"></div>
+        <div class="form-group"><label>Typical Plot (m)</label>
+          <input id="lt-plot-${key}" value="${t.typical_plot_m||''}" style="background:var(--input);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px;font-size:13px;width:100%"></div>
+        <div class="form-group"><label>Confirmed</label>
+          <input type="checkbox" id="lt-conf-${key}" ${t.confirmed?'checked':''} style="width:18px;height:18px;cursor:pointer"></div>
+        <div class="form-group" style="grid-column:1/-1"><label>Layout Rules</label>
+          <div id="lt-rules-${key}">${rules}</div>
+          <button class="btn btn-ghost btn-sm" style="margin-top:6px" onclick="addLayoutRule('${key}')">+ Add Rule</button>
+        </div>
+      </div>
+    </div>`;
+  }
+}
+
+function updateLayoutRule(key, i, val) { mastersData.layout_templates[key].rules[i] = val; }
+function deleteLayoutRule(key, i) { mastersData.layout_templates[key].rules.splice(i,1); renderLayouts(); }
+function addLayoutRule(key) { mastersData.layout_templates[key].rules.push('New rule'); renderLayouts(); }
+
+async function saveLayouts() {
+  const data = mastersData.layout_templates;
+  for(const key of Object.keys(data)) {
+    if(key.startsWith('_')) continue;
+    data[key].name = document.getElementById(`lt-name-${key}`)?.value || data[key].name;
+    data[key].description = document.getElementById(`lt-desc-${key}`)?.value || '';
+    data[key].best_for = document.getElementById(`lt-bf-${key}`)?.value || '';
+    data[key].typical_plot_m = document.getElementById(`lt-plot-${key}`)?.value || '';
+    data[key].confirmed = document.getElementById(`lt-conf-${key}`)?.checked || false;
+  }
+  try { await putMaster('layout_templates', data); toast('Layout templates saved'); }
+  catch(e){ toast(e.message,'error'); }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// LAYOUT PREVIEW CANVAS
+// ══════════════════════════════════════════════════════════════════════════════
+function renderLayoutPreview() {
+  const canvas = document.getElementById('layout-canvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.offsetWidth, H = canvas.height || 380;
+  canvas.width = W; canvas.height = H;
+
+  const stages = +document.getElementById('preview-stages').value;
+  const template = document.getElementById('preview-template').value;
+  const plotW = +document.getElementById('plot-w').value * 0.3048; // ft to m
+  const plotH = +document.getElementById('plot-h').value * 0.3048;
+
+  // Scale: fit plot into canvas with margin
+  const margin = 40;
+  const scaleX = (W - 2*margin) / plotW;
+  const scaleY = (H - 2*margin) / plotH;
+  const scale = Math.min(scaleX, scaleY);
+
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = '#12151f';
+  ctx.fillRect(0,0,W,H);
+
+  // Plot boundary
+  const px = margin, py = margin;
+  const pw = plotW * scale, ph = plotH * scale;
+  ctx.strokeStyle = '#3b82f6';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([6,4]);
+  ctx.strokeRect(px, py, pw, ph);
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#3b82f6';
+  ctx.font = '11px Segoe UI';
+  ctx.fillText(`${document.getElementById('plot-w').value} ft × ${document.getElementById('plot-h').value} ft`, px+4, py-6);
+
+  // Equipment layout based on template & stages
+  const equipment = [];
+  if(template === 'cascade') {
+    equipment.push({name:'VGF',  x:.05, y:.15, w:.12, h:.06, color:'#64748b', label:'VGF'});
+    equipment.push({name:'JAW',  x:.05, y:.35, w:.14, h:.18, color:'#f97316', label:'Jaw'});
+    if(stages>=2) {
+      equipment.push({name:'CONE', x:.38, y:.18, w:.12, h:.14, color:'#8b5cf6', label:'Cone'});
+    }
+    equipment.push({name:'SCR',  x:.58, y:.28, w:.14, h:.12, color:'#06b6d4', label:'Screen'});
+    if(stages>=3) {
+      equipment.push({name:'VSI', x:.78, y:.15, w:.10, h:.10, color:'#22c55e', label:'VSI'});
+    }
+    if(stages>=4) {
+      equipment.push({name:'VSI2',x:.78, y:.38, w:.10, h:.10, color:'#eab308', label:'VSI 2'});
+    }
+    // Stockpiles
+    for(let i=0;i<Math.min(stages+2,5);i++) {
+      equipment.push({name:'SP'+i, x:.82+i*.03, y:.62+i*.04, w:.06, h:.10, color:'#374151', label:'', isStock:true});
+    }
+  } else if(template === 'linear') {
+    const eq = [
+      {name:'VGF',x:.04,y:.38,w:.10,h:.06,color:'#64748b',label:'VGF'},
+      {name:'JAW',x:.18,y:.30,w:.12,h:.20,color:'#f97316',label:'Jaw'},
+      {name:'CONE',x:.38,y:.33,w:.12,h:.14,color:'#8b5cf6',label:'Cone'},
+      {name:'SCR',x:.56,y:.32,w:.14,h:.16,color:'#06b6d4',label:'Screen'},
+      {name:'VSI',x:.76,y:.34,w:.10,h:.12,color:'#22c55e',label:'VSI'},
+    ];
+    eq.slice(0, stages+1).forEach(e => equipment.push(e));
+    for(let i=0;i<4;i++) equipment.push({name:'SP'+i,x:.30+i*.14,y:.65,w:.08,h:.14,color:'#374151',label:'',isStock:true});
+  } else {
+    equipment.push({name:'VGF',  x:.10, y:.80, w:.10, h:.06, color:'#64748b', label:'VGF'});
+    equipment.push({name:'JAW',  x:.08, y:.56, w:.14, h:.18, color:'#f97316', label:'Jaw'});
+    if(stages>=2) equipment.push({name:'CONE',x:.08, y:.28, w:.12, h:.14, color:'#8b5cf6', label:'Cone'});
+    equipment.push({name:'SCR',  x:.35, y:.14, w:.14, h:.12, color:'#06b6d4', label:'Screen'});
+    if(stages>=3) equipment.push({name:'VSI', x:.60, y:.12, w:.10, h:.10, color:'#22c55e', label:'VSI'});
+    for(let i=0;i<3;i++) equipment.push({name:'SP'+i,x:.72+i*.08,y:.55+i*.10,w:.06,h:.10,color:'#374151',label:'',isStock:true});
+  }
+
+  // Draw conveyors first (lines)
+  ctx.strokeStyle = '#475569';
+  ctx.lineWidth = 2;
+  for(let i=0;i<equipment.length-1;i++) {
+    if(equipment[i].isStock || equipment[i+1].isStock) continue;
+    const a = equipment[i], b = equipment[i+1];
+    const ax = px + (a.x+a.w/2)*pw, ay = py + (a.y+a.h)*ph;
+    const bx = px + (b.x+b.w/2)*pw, by = py + (b.y)*ph;
+    ctx.beginPath();
+    ctx.moveTo(ax, ay);
+    // Elbow
+    ctx.lineTo(ax, ay+10);
+    ctx.lineTo(bx, ay+10);
+    ctx.lineTo(bx, by);
+    ctx.stroke();
+    // Arrow
+    ctx.fillStyle = '#475569';
+    ctx.beginPath();
+    ctx.moveTo(bx, by);
+    ctx.lineTo(bx-4, by+10);
+    ctx.lineTo(bx+4, by+10);
+    ctx.fill();
+  }
+
+  // Draw equipment blocks
+  equipment.forEach(e => {
+    const ex = px + e.x*pw, ey = py + e.y*ph;
+    const ew = e.w*pw, eh = e.h*ph;
+    if(e.isStock) {
+      ctx.fillStyle = '#1e2535';
+      ctx.strokeStyle = '#374151';
+      ctx.lineWidth = 1;
+      ctx.fillRect(ex, ey, ew, eh);
+      ctx.strokeRect(ex, ey, ew, eh);
+      ctx.fillStyle = '#475569';
+      ctx.font = '9px Segoe UI';
+      ctx.fillText('SP', ex+ew/2-6, ey+eh/2+3);
+      return;
+    }
+    // Shadow
+    ctx.fillStyle = 'rgba(0,0,0,.3)';
+    ctx.fillRect(ex+3, ey+3, ew, eh);
+    // Box
+    ctx.fillStyle = e.color + '33';
+    ctx.strokeStyle = e.color;
+    ctx.lineWidth = 2;
+    ctx.fillRect(ex, ey, ew, eh);
+    ctx.strokeRect(ex, ey, ew, eh);
+    // Label
+    ctx.fillStyle = '#e2e8f0';
+    ctx.font = `bold ${Math.max(10,Math.min(13,ew/5))}px Segoe UI`;
+    ctx.textAlign = 'center';
+    ctx.fillText(e.label, ex+ew/2, ey+eh/2+4);
+    ctx.textAlign = 'left';
+  });
+
+  // Legend
+  const legendItems = [
+    {color:'#f97316',label:'Jaw Crusher'},
+    {color:'#8b5cf6',label:'Cone Crusher'},
+    {color:'#22c55e',label:'VSI'},
+    {color:'#06b6d4',label:'Screen'},
+    {color:'#64748b',label:'VGF'},
+  ];
+  let lx = px+4, ly = py+ph+12;
+  ctx.font = '11px Segoe UI';
+  legendItems.forEach(l => {
+    ctx.fillStyle = l.color;
+    ctx.fillRect(lx, ly, 10, 10);
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillText(l.label, lx+14, ly+9);
+    lx += ctx.measureText(l.label).width + 32;
+  });
+}
+
+window.addEventListener('resize', renderLayoutPreview);
+init();
+</script>
+</body>
+</html>

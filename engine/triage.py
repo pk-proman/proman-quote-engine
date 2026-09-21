@@ -27,7 +27,7 @@ SPECIAL_DUTY_FLAGS = {
 }
 
 OUT_OF_SCOPE_KEYWORDS = [
-    "coal", "river sand", "gold", "iron ore", "copper",
+    "coal", "river sand", "gold",
     "oil seed", "crushing mill", "ball mill",
 ]
 
@@ -189,8 +189,15 @@ def triage_enquiry(raw_text: str, extracted: dict = None) -> dict:
         missing.append("TPH / capacity not specified")
 
     norm = _normalise(raw_text)
-    material_words = ["granite", "basalt", "limestone", "marble", "quartzite",
-                      "sandstone", "dolomite", "slag"]
+    material_words = [
+        "granite", "basalt", "limestone", "marble", "quartzite",
+        "sandstone", "dolomite", "slag",
+        # Additional minerals PROMAN can process
+        "quartz", "silica", "feldspar", "calcite", "gypsum",
+        "iron ore", "manganese", "copper ore",
+        # Generic terms that imply material is specified
+        "mineral", "ore", "rock", "stone",
+    ]
     if not any(w in norm for w in material_words) and "material" not in str(extracted):
         missing.append("feed material type not specified")
 

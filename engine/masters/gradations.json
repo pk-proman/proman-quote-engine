@@ -1,0 +1,108 @@
+{
+  "_meta": {
+    "description": "Output product gradation specifications. IS = Bureau of Indian Standards. MORTH = Ministry of Road Transport & Highways.",
+    "last_updated": "",
+    "updated_by": ""
+  },
+  "GSB": {
+    "full_name": "Graded Stone Base",
+    "standard": "MORTH Table 400-1 Grading II",
+    "application": "Sub-base / base course for roads and highways",
+    "sieve_mm":       [75,   53.0, 26.5, 9.5,  4.75, 2.36, 0.425, 0.075],
+    "passing_min_pct": [100, 75,   55,   40,   25,   15,   0,     0   ],
+    "passing_max_pct": [100, 100,  90,   80,   65,   40,   25,    10  ],
+    "max_size_mm": 75,
+    "typical_crusher_output": "Jaw + Screen; no tertiary needed",
+    "notes": "Most common highway sub-base. Often produced in 2-stage plant."
+  },
+  "Aggregates_40mm": {
+    "full_name": "40mm Coarse Aggregate",
+    "standard": "IS 383:2016 Graded Aggregate (Nominal size 40mm)",
+    "application": "Concrete, road base, railway ballast",
+    "sieve_mm":       [50,   40,   20,   10,   4.75],
+    "passing_min_pct": [100, 90,   25,   0,    0   ],
+    "passing_max_pct": [100, 100,  55,   10,   5   ],
+    "max_size_mm": 40,
+    "typical_crusher_output": "Jaw + Cone + Screen; oversize of 40mm deck",
+    "notes": "Oversize product from secondary screen."
+  },
+  "Aggregates_20mm": {
+    "full_name": "20mm Coarse Aggregate",
+    "standard": "IS 383:2016 Graded Aggregate (Nominal size 20mm)",
+    "application": "Concrete, bituminous mixes",
+    "sieve_mm":       [25,   20,   10,   4.75],
+    "passing_min_pct": [100, 90,   20,   0   ],
+    "passing_max_pct": [100, 100,  55,   5   ],
+    "max_size_mm": 20,
+    "typical_crusher_output": "20-10mm fraction from 3-deck screen",
+    "notes": "Primary concrete aggregate. High demand product."
+  },
+  "Aggregates_10mm": {
+    "full_name": "10mm Coarse Aggregate",
+    "standard": "IS 383:2016 Graded Aggregate (Nominal size 10mm)",
+    "application": "Concrete, chip seal, SMA",
+    "sieve_mm":       [12.5, 10,   4.75, 2.36],
+    "passing_min_pct": [100, 85,   0,    0   ],
+    "passing_max_pct": [100, 100,  20,   5   ],
+    "max_size_mm": 10,
+    "typical_crusher_output": "Middle deck of 3-deck screen",
+    "notes": ""
+  },
+  "Aggregates_6mm": {
+    "full_name": "6mm Stone Chips",
+    "standard": "IS 383:2016 (nominal 6.3mm)",
+    "application": "Asphalt mixes, chip seal, gap-graded concrete",
+    "sieve_mm":       [10,   6.3,  3.15, 2.36],
+    "passing_min_pct": [100, 85,   0,    0   ],
+    "passing_max_pct": [100, 100,  30,   10  ],
+    "max_size_mm": 6,
+    "typical_crusher_output": "Lower deck of 4-deck screen or VSI discharge screen",
+    "notes": "Requires VSI in circuit to produce in volume."
+  },
+  "M_Sand": {
+    "full_name": "Manufactured Sand (M-Sand)",
+    "standard": "IS 16353:2015 Zone II (crushed sand)",
+    "application": "Replacement for river sand in concrete and plaster",
+    "sieve_mm":       [4.75, 2.36, 1.18, 0.6,  0.3,  0.15],
+    "passing_min_pct": [100, 75,   55,   35,   8,    0   ],
+    "passing_max_pct": [100, 100,  90,   59,   30,   10  ],
+    "max_size_mm": 4.75,
+    "typical_crusher_output": "VSI discharge through bottom screen deck / WSG for washed M-sand",
+    "notes": "VSI mandatory. Dry M-sand = VSI bottom fraction. Washed M-sand = VSI + WSG unit."
+  },
+  "Crusher_Dust": {
+    "full_name": "Crusher Dust / Stone Powder",
+    "standard": "No IS standard — customer spec varies",
+    "application": "Filling, brick making, paver base",
+    "sieve_mm":       [4.75, 2.36, 0.6,  0.075],
+    "passing_min_pct": [100, 80,   30,   0    ],
+    "passing_max_pct": [100, 100,  80,   35   ],
+    "max_size_mm": 4.75,
+    "typical_crusher_output": "Undersize of bottom screen deck",
+    "notes": "By-product of crushing. Often stockpiled separately."
+  },
+  "Railway_Ballast": {
+    "full_name": "Railway Track Ballast",
+    "standard": "IRS:GE/1 (Indian Railways specification)",
+    "application": "Railway track bed",
+    "sieve_mm":       [65,   50,   25,   13.2],
+    "passing_min_pct": [100, 90,   0,    0   ],
+    "passing_max_pct": [100, 100,  25,   5   ],
+    "max_size_mm": 65,
+    "typical_crusher_output": "Jaw + Cone; dedicated screen with 50mm and 25mm decks",
+    "notes": "Requires Los Angeles Abrasion value < 30%. Hard rock (granite/basalt) only. Secondary screen may be needed.",
+    "la_abrasion_max": 30,
+    "flakiness_index_max": 40
+  },
+  "WMM": {
+    "full_name": "Wet Mix Macadam",
+    "standard": "MORTH Table 400-9",
+    "application": "Road base course",
+    "sieve_mm":       [53,   26.5, 9.5,  4.75, 2.36, 0.6,  0.075],
+    "passing_min_pct": [100, 68,   40,   25,   0,    0,    0    ],
+    "passing_max_pct": [100, 88,   64,   42,   25,   10,   5    ],
+    "max_size_mm": 53,
+    "typical_crusher_output": "2-stage plant; blended from 40mm + 20mm + crusher dust",
+    "notes": "Blended product — proportioning bin / pugmill needed downstream."
+  }
+}
