@@ -742,14 +742,19 @@ async function load() {
 }
 
 function showFatalError(msg) {
-  document.getElementById('loading').innerHTML =
-    `<div style="color:#f87171;font-size:13px;max-width:320px;line-height:1.6">
-      <b>⚠ Failed to load 3D viewer</b><br>${msg}<br>
-      <span style="color:#5a7a9a;font-size:11px">Open browser DevTools (F12 → Console) for details.</span>
+  const el = document.getElementById('loading');
+  el.style.display = 'block';   // keep visible even if load() hides it
+  el.style.pointerEvents = 'auto';
+  el.innerHTML =
+    `<div style="color:#f87171;font-size:13px;max-width:360px;line-height:1.8;background:#1a0a0a;border:1px solid #5a1a1a;border-radius:8px;padding:16px">
+      <b style="font-size:14px">⚠ Failed to load 3D viewer</b><br><br>
+      <span style="color:#fca5a5;word-break:break-all">${msg}</span><br><br>
+      <span style="color:#5a7a9a;font-size:11px">Open browser DevTools → Console tab for the full stack trace.</span>
     </div>`;
 }
-try { init(); } catch(e) { showFatalError('3D init error: ' + e.message); console.error('init() threw:', e); }
-load().catch(e => showFatalError('Data load error: ' + e.message));
+let _initOk = false;
+try { init(); _initOk = true; } catch(e) { showFatalError('3D init error: ' + e.message); console.error('init() threw:', e); }
+if (_initOk) load().catch(e => showFatalError('Data load error: ' + e.message));
 </script>
 </body>
 </html>
