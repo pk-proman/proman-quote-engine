@@ -371,27 +371,99 @@ function buildConvSegment(gapX, ay, by, bWidth) {
   const dy = by - ay;
   const len = Math.sqrt(gapX*gapX + dy*dy);
   const angle = Math.atan2(dy, gapX);
-  const midY = (ay+by)/2;
-  const belt = mkBox(len, 0.1, bWidth*0.8, mat(0x1a1a1a,0.85,0.1));
-  belt.position.set(gapX/2, midY, 0);
+  const midX = gapX/2, midY = (ay+by)/2;
+  const BW = bWidth;
+
+  // ── Belt surface ────────────────────────────────────────────────
+  const belt = mkBox(len, 0.07, BW*0.72, mat(0x111111,0.9,0.05));
+  belt.position.set(midX, midY+0.22, 0);
   belt.rotation.z = angle;
   g.add(belt);
-  [-gapX/2, gapX/2].forEach(xo => {
-    const pul = mkCyl(bWidth*0.4, bWidth*0.4, bWidth*0.85, 14, mat(0x444,0.4,0.85));
-    pul.rotation.z = Math.PI/2;
-    pul.position.set(xo+gapX/2, midY + (xo<0 ? -dy/2 : dy/2), 0);
-    g.add(pul);
+
+  // ── Truss top chords (two C-channel stringers) ──────────────────
+  [-BW*0.41, BW*0.41].forEach(zo => {
+    const chord = mkBox(len, 0.13, 0.13, mat(0x2a3a4a,0.55,0.78));
+    chord.position.set(midX, midY+0.13, zo);
+    chord.rotation.z = angle;
+    g.add(chord);
   });
-  // Support legs
-  const numLegs = Math.max(2, Math.floor(len/5));
-  for (let i=1;i<numLegs;i++) {
+
+  // ── Truss bottom chords ─────────────────────────────────────────
+  [-BW*0.41, BW*0.41].forEach(zo => {
+    const chord = mkBox(len, 0.10, 0.10, mat(0x243040,0.58,0.75));
+    chord.position.set(midX, midY-0.32, zo);
+    chord.rotation.z = angle;
+    g.add(chord);
+  });
+
+  // ── Idlers + cross-members every ~1.8m ──────────────────────────
+  const numIdlers = Math.max(3, Math.round(len/1.8));
+  for (let i=0; i<=numIdlers; i++) {
+    const t = i/numIdlers;
+    const lx = gapX*t, ly = ay + dy*t;
+    // Idler roller
+    const idl = mkCyl(0.085, 0.085, BW*0.85, 8, mat(0x3a3a3a,0.5,0.7));
+    idl.rotation.z = Math.PI/2;
+    idl.position.set(lx, ly+0.18, 0);
+    g.add(idl);
+    // Horizontal cross-frame
+    const xf = mkBox(0.07, 0.07, BW*0.9, mat(0x263646,0.6,0.72));
+    xf.position.set(lx, ly+0.13, 0);
+    g.add(xf);
+    // Vertical webs connecting top to bottom chord
+    [-BW*0.41, BW*0.41].forEach(zo => {
+      const web = mkBox(0.06, 0.48, 0.06, mat(0x1e2d3d,0.65,0.68));
+      web.position.set(lx, ly-0.10, zo);
+      g.add(web);
+    });
+    // Diagonal bracing (alternate direction)
+    if (i < numIdlers) {
+      const nx = gapX*(i+1)/numIdlers, ny = ay + dy*(i+1)/numIdlers;
+      [-BW*0.41, BW*0.41].forEach(zo => {
+        const dl = Math.sqrt((nx-lx)**2+(ny-ly)**2+0.48**2);
+        const diag = mkBox(dl, 0.05, 0.05, mat(0x1e2d3d,0.65,0.68));
+        diag.position.set((lx+nx)/2, (ly+ny)/2-0.10, zo);
+        diag.rotation.z = Math.atan2(ny-ly, nx-lx) * (i%2===0?1:-1);
+        g.add(diag);
+      });
+    }
+  }
+
+  // ── Head pulley (discharge end) ──────────────────────────────────
+  const hp = mkCyl(BW*0.39, BW*0.39, BW*0.88, 16, mat(0x333,0.4,0.85));
+  hp.rotation.z = Math.PI/2;
+  hp.position.set(gapX, by, 0);
+  g.add(hp);
+
+  // ── Tail pulley (feed end) ───────────────────────────────────────
+  const tp = mkCyl(BW*0.35, BW*0.35, BW*0.88, 16, mat(0x333,0.4,0.85));
+  tp.rotation.z = Math.PI/2;
+  tp.position.set(0, ay, 0);
+  g.add(tp);
+
+  // ── Feed skirtboards ─────────────────────────────────────────────
+  [-BW*0.36, BW*0.36].forEach(zo => {
+    const sk = mkBox(BW*0.55, 0.55, 0.05, mat(0x1a1a2e,0.75,0.25));
+    sk.position.set(gapX*0.07, ay+0.38, zo);
+    sk.rotation.z = angle;
+    g.add(sk);
+  });
+
+  // ── Support legs under truss ──────────────────────────────────────
+  const numLegs = Math.max(2, Math.floor(len/4));
+  for (let i=1; i<numLegs; i++) {
     const t = i/numLegs;
-    const lx = gapX*t;
-    const lyBelt = ay + dy*t;
-    if (lyBelt > 0.5) {
-      const leg = mkBox(0.09,lyBelt,0.09, mat(0x2a3a4a,0.6,0.75));
-      leg.position.set(lx, lyBelt/2, 0);
-      g.add(leg);
+    const lx = gapX*t, ly = ay + dy*t;
+    if (ly > 0.7) {
+      [-BW*0.38, BW*0.38].forEach(zo => {
+        const leg = mkBox(0.10, ly, 0.10, mat(0x253545,0.6,0.75));
+        leg.position.set(lx, ly/2, zo);
+        g.add(leg);
+      });
+      // Horizontal X-brace between the two legs
+      const xb = mkBox(0.06, 0.06, BW*0.78, mat(0x1e2d3d,0.65,0.68));
+      xb.position.set(lx, ly*0.38, 0);
+      g.add(xb);
     }
   }
   return g;
@@ -399,12 +471,86 @@ function buildConvSegment(gapX, ay, by, bWidth) {
 
 function structColumns(cx, py, pw, pd) {
   const g = new THREE.Group();
-  const h = py+0.2;
-  [[-pw*0.35,-pd*0.35],[-pw*0.35,pd*0.35],[pw*0.35,-pd*0.35],[pw*0.35,pd*0.35]].forEach(([ox,oz]) => {
-    const col = mkBox(0.18,h,0.18, mat(0x253545,0.55,0.75));
+  const h = py + 0.25;
+  const corners = [[-pw*0.35,-pd*0.35],[-pw*0.35,pd*0.35],[pw*0.35,-pd*0.35],[pw*0.35,pd*0.35]];
+
+  // ── Main columns (100×100 box section) ────────────────────────────
+  corners.forEach(([ox,oz]) => {
+    const col = mkBox(0.20, h, 0.20, mat(0x253545,0.55,0.75));
     col.position.set(cx+ox, h/2, oz);
     g.add(col);
   });
+
+  // ── Platform beams at top (along both axes) ───────────────────────
+  [-pd*0.35, pd*0.35].forEach(oz => {
+    const b = mkBox(pw*0.72, 0.24, 0.20, mat(0x1e3050,0.5,0.8));
+    b.position.set(cx, h+0.12, oz);
+    g.add(b);
+  });
+  [-pw*0.35, pw*0.35].forEach(ox => {
+    const b = mkBox(0.20, 0.20, pd*0.72, mat(0x1e3050,0.5,0.8));
+    b.position.set(cx+ox, h+0.10, 0);
+    g.add(b);
+  });
+
+  // ── Grating platform surface ──────────────────────────────────────
+  const plat = mkBox(pw*0.74, 0.06, pd*0.74, mat(0x1a2a3a,0.85,0.55));
+  plat.position.set(cx, h+0.21, 0);
+  g.add(plat);
+
+  // ── X-bracing on long faces (parallel to X) ───────────────────────
+  const mBrace = new THREE.LineBasicMaterial({color:0x2a4060});
+  [-pd*0.35, pd*0.35].forEach(oz => {
+    [
+      [cx-pw*0.35,0, cx+pw*0.35,h],
+      [cx+pw*0.35,0, cx-pw*0.35,h]
+    ].forEach(([x1,y1,x2,y2]) => {
+      const geo = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(x1,y1,oz), new THREE.Vector3(x2,y2,oz)
+      ]);
+      g.add(new THREE.Line(geo, mBrace));
+    });
+  });
+
+  // ── X-bracing on short faces (parallel to Z) ──────────────────────
+  [-pw*0.35, pw*0.35].forEach(ox => {
+    [
+      [cx+ox,-pd*0.35,0, cx+ox,pd*0.35,h],
+      [cx+ox,pd*0.35,0, cx+ox,-pd*0.35,h]
+    ].forEach(([x1,z1,y1, x2,z2,y2]) => {
+      const geo = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(x1,y1,z1), new THREE.Vector3(x2,y2,z2)
+      ]);
+      g.add(new THREE.Line(geo, mBrace));
+    });
+  });
+
+  // ── Mid-height horizontal tie beams ───────────────────────────────
+  if (h > 6) {
+    const mh = h*0.5;
+    [-pd*0.35, pd*0.35].forEach(oz => {
+      const tb = mkBox(pw*0.72, 0.16, 0.16, mat(0x1e3050,0.55,0.72));
+      tb.position.set(cx, mh, oz);
+      g.add(tb);
+    });
+  }
+
+  // ── Access stair on one side ──────────────────────────────────────
+  const nSteps = Math.max(4, Math.round(h/0.42));
+  for (let s=0; s<nSteps; s++) {
+    const sy = (s+0.5)*h/nSteps;
+    const sx = cx - pw*0.35 - 0.45 - s*0.28;
+    const step = mkBox(0.48, 0.06, 0.85, mat(0x1e3050,0.75,0.5));
+    step.position.set(sx, sy, pd*0.35+0.48);
+    g.add(step);
+  }
+  // Stair handrail
+  const rGeo = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(cx-pw*0.35-0.45, 0.9, pd*0.35+0.48),
+    new THREE.Vector3(cx-pw*0.35-0.45-nSteps*0.28, h*0.95, pd*0.35+0.48)
+  ]);
+  g.add(new THREE.Line(rGeo, new THREE.LineBasicMaterial({color:0x3a5a7a})));
+
   return g;
 }
 
@@ -418,21 +564,64 @@ function rrect(ctx, x, y, w, h, r) {
   ctx.lineTo(x, y+r); ctx.arcTo(x,y,x+r,y,r);
   ctx.closePath();
 }
-function mkLabel(text) {
+function mkLabel(text, dims) {
   const cv = document.createElement('canvas');
-  cv.width = 280; cv.height = 64;
+  cv.width = 320; cv.height = dims ? 78 : 58;
   const ctx = cv.getContext('2d');
-  ctx.fillStyle = 'rgba(10,25,50,0.75)';
-  rrect(ctx,2,2,276,60,8); ctx.fill();
+  ctx.fillStyle = 'rgba(8,20,44,0.82)';
+  rrect(ctx,2,2,316,cv.height-4,8); ctx.fill();
+  ctx.strokeStyle='rgba(126,185,245,0.35)';ctx.lineWidth=1;
+  rrect(ctx,2,2,316,cv.height-4,8); ctx.stroke();
   ctx.fillStyle = '#7eb9f5';
-  ctx.font = 'bold 20px Arial';
+  ctx.font = 'bold 19px Arial';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(text.length>22 ? text.slice(0,21)+'…' : text, 140, 32);
+  ctx.fillText(text.length>24 ? text.slice(0,23)+'…' : text, 160, dims ? 24 : cv.height/2);
+  if (dims) {
+    ctx.fillStyle = '#5a9ad0';
+    ctx.font = '13px Arial';
+    ctx.fillText(dims, 160, 56);
+  }
   const tex = new THREE.CanvasTexture(cv);
   const spr = new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:false}));
-  spr.scale.set(4,0.9,1);
+  spr.scale.set(dims ? 5.2 : 4.2, dims ? 1.25 : 0.95, 1);
   spr.renderOrder = 999;
   return spr;
+}
+
+// ── Dimension annotation helper ────────────────────────────────────
+function addDimLine(x1,y1,z1, x2,y2,z2, label, color=0x2a6090) {
+  const mat2 = new THREE.LineBasicMaterial({color});
+  // Main dimension line
+  const geo = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(x1,y1,z1), new THREE.Vector3(x2,y2,z2)
+  ]);
+  scene.add(new THREE.Line(geo, mat2));
+  // Tick marks (small perpendicular lines)
+  const dx=x2-x1, dy=y2-y1;
+  const len=Math.sqrt(dx*dx+dy*dy)||1;
+  const ny=-dy/len*0.4, nx=dx/len*0.4;
+  [[x1,y1],[x2,y2]].forEach(([tx,ty]) => {
+    const tg = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(tx-nx*0.5,ty-ny*0.5,z1),
+      new THREE.Vector3(tx+nx*0.5,ty+ny*0.5,z1)
+    ]);
+    scene.add(new THREE.Line(tg, mat2));
+  });
+  // Label sprite
+  const cv2 = document.createElement('canvas');
+  cv2.width=180; cv2.height=36;
+  const ctx2=cv2.getContext('2d');
+  ctx2.fillStyle='rgba(8,20,44,0.78)';
+  rrect(ctx2,1,1,178,34,5); ctx2.fill();
+  ctx2.fillStyle='#9ecaf0'; ctx2.font='bold 15px Arial';
+  ctx2.textAlign='center'; ctx2.textBaseline='middle';
+  ctx2.fillText(label,90,18);
+  const tex2=new THREE.CanvasTexture(cv2);
+  const spr=new THREE.Sprite(new THREE.SpriteMaterial({map:tex2,transparent:true,depthTest:false}));
+  spr.scale.set(3.2,0.62,1);
+  spr.position.set((x1+x2)/2,(y1+y2)/2+0.6,(z1+z2)/2);
+  spr.renderOrder=998;
+  scene.add(spr);
 }
 
 // ── Build Scene ────────────────────────────────────────────────────
@@ -477,10 +666,11 @@ function buildScene(positions) {
     scene.add(g);
     meshGroups[item.id] = g;
 
-    // Label
+    // Label with size annotation
     if (item.bom_include || item.category==='STOCKPILE') {
-      const lbl = mkLabel(item.label);
-      lbl.position.set(0, ph + 1.0, 0);
+      const dimStr = `${(pw*1000).toFixed(0)} × ${(pd*1000).toFixed(0)} mm  H: ${(ph*1000).toFixed(0)} mm`;
+      const lbl = mkLabel(item.label, dimStr);
+      lbl.position.set(0, ph + 1.2, 0);
       g.add(lbl);
     }
   });
@@ -499,6 +689,74 @@ function buildScene(positions) {
     cv.position.set(ax, 0, 0);
     scene.add(cv);
   }
+
+  // ── Dimension annotations ──────────────────────────────────────────
+  addDimensionAnnotations(positions);
+}
+
+function addDimensionAnnotations(positions) {
+  if (!positions || !positions.length) return;
+  const DIMZ = 6.5;   // Z offset for dimension lines (in front of plant)
+  const ELVZ = -6.5;  // Z offset for elevation markers (behind plant)
+
+  // Total plant length dimension (front, at ground level)
+  const first = positions[0], last = positions[positions.length-1];
+  const totalStart = first.pos[0];
+  const totalEnd   = last.pos[0]+last.size[0];
+  addDimLine(totalStart, -0.6, DIMZ, totalEnd, -0.6, DIMZ,
+    `Plant length: ${(totalEnd-totalStart).toFixed(1)} m`, 0x1e6090);
+
+  // Per-equipment width dimension at front face
+  positions.forEach(item => {
+    if (!item.bom_include) return;
+    const [pw,ph,pd] = item.size, [px,py] = item.pos;
+    const x1 = px, x2 = px+pw;
+    addDimLine(x1, py-0.4, DIMZ, x2, py-0.4, DIMZ,
+      `${(pw*1000).toFixed(0)} mm`, 0x1a4a6a);
+  });
+
+  // Elevation markers — vertical dimension lines on right side
+  const elevMat = new THREE.LineBasicMaterial({color:0x1e5080});
+  const RIGHT_X = totalEnd + 2.5;
+  positions.forEach(item => {
+    if (!item.bom_include || item.pos[1] < 1.5) return;
+    const [pw,ph,pd] = item.size, [px,py] = item.pos;
+    const cx = px+pw/2;
+    // Vertical line from ground to equipment base
+    const vGeo = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(cx, 0, ELVZ), new THREE.Vector3(cx, py, ELVZ)
+    ]);
+    scene.add(new THREE.Line(vGeo, elevMat));
+    // Horizontal reach line to equipment
+    const hGeo = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(cx, py, ELVZ), new THREE.Vector3(cx, py, item.pos[2]+pd/2+0.3)
+    ]);
+    scene.add(new THREE.Line(hGeo, elevMat));
+    // Elevation label
+    const cv2 = document.createElement('canvas');
+    cv2.width=160; cv2.height=34;
+    const ctx2=cv2.getContext('2d');
+    ctx2.fillStyle='rgba(8,20,44,0.78)';
+    rrect(ctx2,1,1,158,32,5); ctx2.fill();
+    ctx2.fillStyle='#7ec8a0'; ctx2.font='bold 14px Arial';
+    ctx2.textAlign='center'; ctx2.textBaseline='middle';
+    ctx2.fillText(`EL: +${py.toFixed(1)} m`, 80, 17);
+    const tex2=new THREE.CanvasTexture(cv2);
+    const elevSpr=new THREE.Sprite(new THREE.SpriteMaterial({map:tex2,transparent:true,depthTest:false}));
+    elevSpr.scale.set(2.8,0.58,1);
+    elevSpr.position.set(cx, py+0.5, ELVZ);
+    elevSpr.renderOrder=997;
+    scene.add(elevSpr);
+  });
+
+  // Equipment height dimension (vertical bar beside each piece)
+  positions.forEach(item => {
+    if (!item.bom_include) return;
+    const [pw,ph,pd] = item.size, [px,py] = item.pos;
+    const x2 = px+pw+0.6;
+    addDimLine(x2, py, -pd/2, x2, py+ph, -pd/2,
+      `H: ${(ph*1000).toFixed(0)} mm`, 0x1a5a40);
+  });
 }
 
 // ── Camera switching ───────────────────────────────────────────────
