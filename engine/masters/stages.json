@@ -1,12 +1,12 @@
 {
   "_meta": {
-    "description": "Plant stage configurations. Fill erection_lump and electrical_base for each stage.",
-    "last_updated": "",
-    "updated_by": ""
+    "description": "Plant stage configurations with actual equipment models derived from PROMAN PFDs (AggFlow). Equipment selection validated against 9 live projects (150-600 TPH, 2026).",
+    "last_updated": "2026-09-26",
+    "updated_by": "PFD Analysis"
   },
   "1": {
     "name": "1-Stage Primary Crushing",
-    "description": "VGF → Jaw Crusher → Single-deck screen. Suitable for road metal, base course, aggregates up to 40mm.",
+    "description": "VGF → Jaw → Screen. Suitable for road metal / GSB base course. Coarse aggregates only.",
     "tph_range": [50, 150],
     "equipment_sequence": ["VGF", "JAW", "SCREEN"],
     "vgf_required": true,
@@ -14,16 +14,16 @@
     "vsi_required": false,
     "secondary_screen": false,
     "conveyor_count_approx": 5,
-    "typical_products": ["40mm", "20mm", "Crusher Dust"],
+    "typical_products": ["40mm", "GSB/WMM"],
     "erection_lump": 5.0,
     "electrical_base": 12.0,
-    "electrical_note": "[To be confirmed] Estimated for 1-stage with jaw soft-starter",
+    "electrical_note": "Jaw with DOL/soft-starter only",
     "structural_ton_approx": 8,
-    "notes": "[To be confirmed by engineering] 1-stage suitable for < 150 TPH road metal applications"
+    "notes": "1-stage not reflected in PFDs provided; based on engineering estimate. Suitable for quarry road-base only."
   },
   "2": {
     "name": "2-Stage Primary + Secondary",
-    "description": "VGF → Jaw → Cone → Multi-deck screen. Standard aggregate plant.",
+    "description": "VGF → Jaw → Cone → 4-deck Screen. Standard aggregate plant. Produces 40/20/10/Dust.",
     "tph_range": [100, 350],
     "equipment_sequence": ["VGF", "JAW", "CONE", "SCREEN"],
     "vgf_required": true,
@@ -32,34 +32,138 @@
     "secondary_screen": false,
     "conveyor_count_approx": 8,
     "typical_products": ["40mm", "20mm", "10mm", "Crusher Dust"],
+    "screen_cuts_mm": [40, 20, 10, 4.75],
+    "equipment_by_tph": {
+      "150": {
+        "vgf": "VGF 1.0m x 4.0m",
+        "jaw": "PROJaw 3624",
+        "jaw_css_mm": 110,
+        "cone": "PROCone-3510",
+        "cone_css_mm": 32,
+        "screen": "2.0m x 6.0m 4-Deck",
+        "feed_size_max_mm": 500,
+        "vgf_feed_mtph": 145,
+        "jaw_product_mtph": 119,
+        "pfd_ref": "150TPH 2STG - Nexgen Infrastructure (Jun-2026)"
+      },
+      "250": {
+        "vgf": "VGF 1.2m x 5.0m",
+        "jaw": "PROJaw 4230 (42x30)",
+        "jaw_css_mm": 110,
+        "cone": "PROCone-4510",
+        "cone_css_mm": 30,
+        "screen": "4-Deck (size TBC)",
+        "feed_size_max_mm": 650,
+        "vgf_feed_mtph": 200,
+        "jaw_product_mtph": 165,
+        "pfd_ref": "250TPH 2STG - Nexgen Infrastructure (Jun-2026)"
+      }
+    },
+    "product_fractions_pct": {
+      "40mm": 31, "20mm": 28, "10mm": 18, "dust": 16, "oversize_recirc": 7
+    },
     "erection_lump": 8.0,
     "erection_portable_lump": 6.0,
     "electrical_base": 24.0,
     "electrical_note": "Cone with soft starter. Add ~4L for VFD drives.",
     "structural_ton_approx": 18,
-    "notes": "Standard 2-stage stationary configuration"
+    "notes": "Validated against 150 TPH and 250 TPH granite 2-stage PFDs. CSS granite: 110mm jaw / 30-32mm cone."
   },
   "3": {
     "name": "3-Stage Primary + Secondary + Tertiary VSI",
-    "description": "VGF → Jaw → Cone → VSI → Multi-deck screen. Full gradation plant with M-sand capability.",
-    "tph_range": [150, 500],
-    "equipment_sequence": ["VGF", "JAW", "CONE", "VSI", "SCREEN"],
+    "description": "VGF → Jaw → Cone → Intermediate Screen → VSI → Final 4-deck Screen. Full gradation plant with shaped aggregate and M-sand capability.",
+    "tph_range": [150, 650],
+    "equipment_sequence": ["VGF", "JAW", "CONE", "SCREEN_INT", "VSI", "SCREEN_FINAL"],
     "vgf_required": true,
     "cone_required": true,
     "vsi_required": true,
-    "secondary_screen": false,
+    "secondary_screen": true,
     "conveyor_count_approx": 12,
-    "typical_products": ["40mm", "20mm", "10mm", "6mm", "M-Sand / Crusher Dust"],
+    "typical_products": ["20mm", "12mm", "8mm", "M-Sand / Crusher Dust"],
+    "screen_cuts_mm": {
+      "standard": [20, 12, 8, 4.75],
+      "road_products": [25, 19, 10, 5]
+    },
+    "equipment_by_tph": {
+      "150": {
+        "vgf": "VGF 1.0m x 4.0m",
+        "jaw": "PROJaw 3624",
+        "jaw_css_mm": 110,
+        "cone": "PROCone-3510",
+        "cone_css_mm": 28,
+        "vsi": "PROMAN REMco VSI-200",
+        "screen_int": "1.2m x 4.0m 3-Deck",
+        "screen_final": "2.0m x 5.0m 4-Deck",
+        "feed_size_max_mm": 500,
+        "vgf_feed_mtph": 150,
+        "jaw_product_mtph": 127,
+        "vsi_throughput_mtph": 142,
+        "pfd_ref": "150TPH 3STG - (Sep-2026)"
+      },
+      "250": {
+        "vgf": "VGF 1.2m x 5.0m",
+        "jaw": "PROJaw 4230 (42x30)",
+        "jaw_css_mm": 127,
+        "cone": "PROCone-4510",
+        "cone_css_mm": 32,
+        "vsi": "PROMAN REMco VSI-300",
+        "screen_int": "2.0m x 6.0m 4-Deck",
+        "screen_final": "1.2m x 4.0m 3-Deck",
+        "feed_size_max_mm": 650,
+        "vgf_feed_mtph": 200,
+        "jaw_product_mtph": 176,
+        "vsi_throughput_mtph": 242,
+        "pfd_ref": "250TPH 3STG Basalt - (Sep-2026)"
+      },
+      "300": {
+        "vgf": "VGF 1.3m x 5.6m",
+        "jaw": "PROJaw 4230 (42x30)",
+        "jaw_css_mm": 152,
+        "cone": "PROCone-5010",
+        "cone_css_mm": 34,
+        "vsi": "PROMAN REMco VSI-4060",
+        "vsi_motor_hp": "2x300 HP",
+        "screen_int": "2.0m x 5.0m 3-Deck",
+        "screen_final": "2.0m x 7.0m 4-Deck",
+        "screen_cuts_mm": [25, 19, 10, 5],
+        "feed_size_max_mm": 650,
+        "vgf_feed_mtph": 350,
+        "jaw_product_mtph": 239,
+        "vsi_throughput_mtph": 312,
+        "pfd_ref": "300TPH 3STG Limestone - Dathin Cont. (Sep-2026)"
+      },
+      "600": {
+        "vgf": "VGF 1.3m x 5.6m",
+        "jaw": "PROJaw 49x38 (Hcy-1250x950)",
+        "jaw_css_mm": 125,
+        "cone": "2x PROCone-5010 (50-50 split)",
+        "cone_css_mm": 28,
+        "cone_motor_hp": "2x400 HP",
+        "vsi": "PROMAN REMco VSI-5080",
+        "vsi_motor_hp": "2x400 HP",
+        "screen_int": "2x (2.4m x 8.1m 3-Deck)",
+        "screen_final": "2x (2.4m x 8.1m 3-Deck)",
+        "feed_size_max_mm": 750,
+        "vgf_feed_mtph": 600,
+        "jaw_product_mtph": 359,
+        "vsi_throughput_mtph": 650,
+        "note": "Twin cones and screens. Gabro SP 2.7-2.8.",
+        "pfd_ref": "600TPH 3STG Gabro - NAEL (Sep-2026)"
+      }
+    },
+    "product_fractions_pct": {
+      "20mm": 24, "12mm": 17, "8mm": 16, "dust_msand": 30, "oversize_recirc": 13
+    },
     "erection_lump": 12.0,
     "erection_portable_lump": null,
     "electrical_base": 50.0,
-    "electrical_note": "VSI-300 plant ~49-51L; VSI-5080 plant ~88L. Includes MCC panel.",
+    "electrical_note": "VSI-200/300 plant ~49-51L; VSI-4060 plant ~75L; VSI-5080 twin-cone plant ~120L. Includes MCC panel.",
     "structural_ton_approx": 32,
-    "notes": "Standard 3-stage. WSG-70 addon for wet M-sand."
+    "notes": "Validated against 4 PFDs: 150/250/300/600 TPH. Intermediate screen required between cone and VSI."
   },
   "4": {
-    "name": "4-Stage Primary + Secondary + Dual Tertiary",
-    "description": "VGF → Jaw → Cone → VSI (shaping) → Secondary VSI (sand) → Screens. High-value shaped aggregate + M-sand plant.",
+    "name": "4-Stage Primary + Secondary + Dual Tertiary VSI",
+    "description": "VGF → Jaw → Cone → VSI (shaping) → Secondary VSI (sand) → Screens. Dual VSI for maximum shaped aggregate + high-quality M-sand.",
     "tph_range": [300, 700],
     "equipment_sequence": ["VGF", "JAW", "CONE", "VSI", "VSI", "SCREEN"],
     "vgf_required": true,
@@ -74,6 +178,6 @@
     "electrical_base": 110.0,
     "electrical_note": "[To be confirmed] Dual VSI + Cone + Jaw. Includes SCADA/PLC panel.",
     "structural_ton_approx": 55,
-    "notes": "[To be confirmed] 4-stage for railway ballast + shaped aggregate + M-sand simultaneous production"
+    "notes": "[Engineering estimate — no PFD available] 4-stage for railway ballast + shaped aggregate + M-sand simultaneous production."
   }
 }

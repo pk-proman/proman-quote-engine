@@ -32,6 +32,7 @@ from bundle import (BundleSpec, BundleEquipmentItem, BundleConveyorItem,
 from erpnext_bridge import (parse_lead_payload, push_quote_to_lead,
                              fetch_lead, list_new_leads)
 import masters_manager as mm
+from equipment_selector import build_equipment_schedule
 
 # ---------------------------------------------------------------------------
 app = FastAPI(title="PROMAN Quotation Engine", version="1.0.0")
@@ -443,6 +444,213 @@ async def masters_ui(current_user: dict = Depends(require_admin)):
     if masters_page.exists():
         return masters_page.read_text()
     return HTMLResponse("<h2>masters.html not found in static/</h2>", status_code=404)
+
+
+# ---------------------------------------------------------------------------
+# 3D LAYOUT + BOM ENDPOINTS
+# ---------------------------------------------------------------------------
+
+def _compute_plant_positions(schedule: dict) -> list:
+    """Compute 3D positions (x,y,z) and visual properties for each equipment item."""
+    items = []
+    x = 0.0
+    stages = schedule["stages"]
+
+    # ROM Hopper
+    items.append({"id":"hopper","category":"HOPPER","label":"ROM Hopper",
+        "model":"40T Surge Hopper","pos":[x,0,0],"size":[3.5,5,4.5],
+        "color":"#D97706","stage":0,"elevation":0,"bom_include":False})
+    x += 5
+
+    # VGF
+    vgf = schedule["vgf"]
+    items.append({"id":"vgf","category":"VGF","label":vgf["model"],
+        "model":vgf["model"],"pos":[x,0.5,0],"size":[5,1,1.5],
+        "color":"#F59E0B","stage":1,"elevation":0,"bom_include":True,
+        "specs":f"Feed cap: {vgf.get('feed_capacity_mtph')} mt/h | Max feed: {vgf.get('max_feed_mm')}mm"})
+    x += 10
+
+    # JAW
+    jaw = schedule["jaw"]
+    items.append({"id":"jaw","category":"JAW","label":jaw["model"],
+        "model":jaw["model"],"pos":[x,1.5,0],"size":[4,3,3],
+        "color":"#DC2626","stage":1,"elevation":0,"bom_include":True,
+        "specs":f"CSS: {jaw.get('css_mm')}mm"})
+    x += 14
+
+    # Surge Bin 1
+    items.append({"id":"surge1","category":"BIN","label":"Surge Bin 1",
+        "model":"Surge Bin 30T","pos":[x,0,0],"size":[2.5,4,2.5],
+        "color":"#6B7280","stage":1,"elevation":0,"bom_include":True,
+        "specs":"30T capacity"})
+    x += 8
+
+    if schedule.get("cone"):
+        cone = schedule["cone"]
+        items.append({"id":"cone","category":"CONE","label":cone["model"],
+            "model":cone["model"],"pos":[x,5,0],"size":[3.5,3.5,3.5],
+            "color":"#2563EB","stage":2,"elevation":5,"bom_include":True,
+            "specs":f"CSS: {cone.get('css_mm')}mm {'| Twin unit' if cone.get('twin') else ''}"})
+        x += 14
+
+        if stages >= 3 and schedule.get("vsi"):
+            int_scr = (schedule["screens"] or {}).get("intermediate")
+            if int_scr:
+                items.append({"id":"screen_int","category":"SCREEN",
+                    "label":int_scr["model"],"model":int_scr["model"],
+                    "pos":[x,4.5,0],"size":[6,2,2.8],
+                    "color":"#059669","stage":2,"elevation":4,"bom_include":True,
+                    "specs":f"{int_scr.get('decks',3)}-Deck intermediate"})
+                x += 12
+
+            # Surge Bin 2
+            items.append({"id":"surge2","category":"BIN","label":"Surge Bin 2",
+                "model":"Surge Bin 15T","pos":[x,2.5,0],"size":[2,3.5,2],
+                "color":"#6B7280","stage":2,"elevation":2,"bom_include":True,
+                "specs":"15T capacity"})
+            x += 7
+
+            vsi = schedule["vsi"]
+            items.append({"id":"vsi","category":"VSI","label":vsi["model"],
+                "model":vsi["model"],"pos":[x,5.5,0],"size":[2.8,2.5,2.8],
+                "color":"#7C3AED","stage":3,"elevation":5,"bom_include":True,
+                "specs":f"Max feed: {vsi.get('max_feed_mm')}mm | {vsi.get('motor_hp','')} HP"})
+            x += 10
+
+    # Final screen
+    fin_scr = (schedule["screens"] or {}).get("final")
+    if fin_scr:
+        cuts = ", ".join(str(c) for c in schedule["gradation"]["cuts_mm"])
+        items.append({"id":"screen_final","category":"SCREEN",
+            "label":fin_scr["model"],"model":fin_scr["model"],
+            "pos":[x,4,0],"size":[7,2.4,2.8],
+            "color":"#059669","stage":stages,"elevation":3.5,"bom_include":True,
+            "specs":f"{fin_scr.get('decks',4)}-Deck | Cuts: {cuts}mm"})
+        x += 12
+
+    # Stockpile area marker
+    items.append({"id":"stockpile","category":"STOCKPILE","label":"Product Stockpiles",
+        "model":"Conical Stockpile","pos":[x,0,0],"size":[8,0.1,12],
+        "color":"#92400E","stage":stages,"elevation":0,"bom_include":False,
+        "stockpile":True})
+
+    # Compute plant footprint
+    schedule["_plant_length_m"] = round(x, 1)
+    return items
+
+
+def _build_bom(schedule: dict, positions: list) -> list:
+    """Structured BOM from equipment positions."""
+    stage_labels = {
+        0:"Feed", 1:"Stage 1 — Primary", 2:"Stage 2 — Secondary",
+        3:"Stage 3 — Tertiary VSI"
+    }
+    bom, sl = [], 1
+    for item in positions:
+        if not item.get("bom_include"):
+            continue
+        qty = 2 if (item.get("category") == "CONE" and schedule.get("cone",{}).get("twin")) else 1
+        bom.append({"sl":sl,"stage":stage_labels.get(item["stage"],f"Stage {item['stage']}"),
+            "category":item["category"],"description":item["label"],
+            "model":item["model"],"qty":qty,"specs":item.get("specs","")})
+        sl += 1
+    # Conveyors
+    conv_count = {1:5,2:8,3:12}.get(schedule["stages"],8)
+    bom.append({"sl":sl,"stage":"Conveyor System","category":"CONVEYOR",
+        "description":"Belt Conveyor (various)","model":"Rubber Belt Conveyor",
+        "qty":conv_count,"specs":"Width: 600/800/1000mm"})
+    sl += 1
+    bom.append({"sl":sl,"stage":"Electrical","category":"ELECTRICAL",
+        "description":"MCC Panel + Motor Cables","model":"Motor Control Centre",
+        "qty":1,"specs":f"Est. {schedule.get('_total_hp','—')} HP connected load"})
+    return bom
+
+
+@app.get("/api/layout/3d-data")
+async def get_3d_layout_data(
+    tph: int, stages: int = 2, material: str = "Granite",
+    _: dict = Depends(require_login)
+):
+    """Return equipment schedule with 3D positions for the plant layout viewer."""
+    schedule = build_equipment_schedule(tph, stages, material)
+    positions = _compute_plant_positions(schedule)
+    bom = _build_bom(schedule, positions)
+    return {"tph": tph, "stages": stages, "material": material,
+            "schedule": schedule, "positions": positions, "bom": bom,
+            "plant_length_m": schedule.get("_plant_length_m", 0)}
+
+
+@app.get("/api/layout/bom-excel")
+async def download_bom_excel(
+    tph: int, stages: int = 2, material: str = "Granite", client: str = "Client",
+    _: dict = Depends(require_login)
+):
+    """Download BOM as Excel file."""
+    import openpyxl
+    from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+
+    schedule = build_equipment_schedule(tph, stages, material)
+    positions = _compute_plant_positions(schedule)
+    bom = _build_bom(schedule, positions)
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "BOM"
+
+    navy = PatternFill("solid", fgColor="1F3864")
+    hdr_font = Font(color="FFFFFF", bold=True, size=10)
+    thin = Side(style="thin", color="D1DCE8")
+    bdr = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+    # Title block
+    ws.merge_cells("A1:G1")
+    ws["A1"] = f"PROMAN — Bill of Materials | {client} | {tph} TPH {stages}-Stage | {material}"
+    ws["A1"].font = Font(bold=True, size=12, color="1F3864")
+    ws["A1"].alignment = Alignment(horizontal="center")
+    ws.row_dimensions[1].height = 22
+
+    headers = ["Sl","Stage","Category","Description","Model","Qty","Specs / Notes"]
+    for ci, h in enumerate(headers, 1):
+        cell = ws.cell(row=2, column=ci, value=h)
+        cell.fill = navy; cell.font = hdr_font
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        cell.border = bdr
+    ws.row_dimensions[2].height = 18
+
+    cat_colors = {"HOPPER":"FEF3C7","VGF":"FDE68A","JAW":"FEE2E2","CONE":"DBEAFE",
+                  "VSI":"EDE9FE","SCREEN":"D1FAE5","BIN":"F3F4F6",
+                  "CONVEYOR":"FEF3C7","ELECTRICAL":"E0E7FF"}
+    widths = [5, 28, 14, 32, 28, 6, 40]
+    for ci, w in enumerate(widths, 1): ws.column_dimensions[chr(64+ci)].width = w
+
+    for row_i, item in enumerate(bom, 3):
+        vals = [item["sl"],item["stage"],item["category"],item["description"],
+                item["model"],item["qty"],item["specs"]]
+        fill_color = cat_colors.get(item["category"], "FFFFFF")
+        fill = PatternFill("solid", fgColor=fill_color)
+        for ci, v in enumerate(vals, 1):
+            cell = ws.cell(row=row_i, column=ci, value=v)
+            cell.fill = fill; cell.border = bdr
+            cell.alignment = Alignment(wrap_text=True, vertical="center")
+            if ci in (1,6): cell.alignment = Alignment(horizontal="center", vertical="center")
+        ws.row_dimensions[row_i].height = 16
+
+    # Footer
+    footer_row = len(bom) + 4
+    ws.cell(row=footer_row, column=1, value="Note: Dimensions & specs are indicative. Confirm with PROMAN engineering before ordering.")
+    ws.cell(row=footer_row, column=1).font = Font(italic=True, size=9, color="6B7A90")
+
+    out = TMP / f"BOM_{client}_{tph}TPH_{stages}STG.xlsx"
+    wb.save(str(out))
+    filename = f"BOM_{client}_{tph}TPH_{stages}STG.xlsx"
+    return FileResponse(str(out), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+
+@app.get("/layout3d", response_class=HTMLResponse)
+async def layout3d_page(_: dict = Depends(require_login)):
+    p = STATIC / "layout3d.html"
+    return p.read_text() if p.exists() else HTMLResponse("<h2>layout3d.html not found</h2>", 404)
 
 
 # ---------------------------------------------------------------------------

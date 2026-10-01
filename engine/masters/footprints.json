@@ -1,136 +1,218 @@
 {
   "_meta": {
-    "description": "Equipment footprint dimensions for plant layout generation. All dimensions in metres. Platform height = height of feed point above ground. Weight in tonnes.",
-    "last_updated": "",
-    "updated_by": "",
-    "confirm_note": "Values marked [TBC] are industry approximations — replace with actual PROMAN/OEM drawings"
+    "description": "Equipment footprint dimensions for plant layout generation. All dimensions in metres. Model names validated from PROMAN PFDs (2026). Dimensions are engineering approximations — replace with actual PROMAN GA drawings.",
+    "last_updated": "2026-09-26",
+    "updated_by": "PFD Analysis",
+    "confirm_note": "Model names confirmed from PFDs. Physical dimensions still require PROMAN OEM GA drawings."
   },
   "VGF": {
-    "1200x4000": {
-      "length_m": 4.8, "width_m": 1.6, "height_m": 1.2,
-      "platform_h": 0.0, "weight_t": 2.0,
+    "1000x4000": {
+      "label": "VGF 1.0m x 4.0m",
+      "length_m": 4.8, "width_m": 1.4, "height_m": 1.0,
+      "platform_h": 0.0, "weight_t": 1.8,
+      "feed_h": 1.0, "discharge_h": 0.3,
+      "tph_range": [100, 160],
+      "confirmed": false,
+      "note": "Used in 150 TPH 2-stage & 3-stage PFDs. Feed 0-500mm."
+    },
+    "1200x5000": {
+      "label": "VGF 1.2m x 5.0m",
+      "length_m": 5.8, "width_m": 1.6, "height_m": 1.2,
+      "platform_h": 0.0, "weight_t": 2.8,
       "feed_h": 1.2, "discharge_h": 0.3,
-      "confirmed": false, "note": "[TBC]"
+      "tph_range": [180, 280],
+      "confirmed": false,
+      "note": "Used in 250 TPH 2-stage & 3-stage PFDs. Feed 0-650mm."
     },
-    "1500x5500": {
-      "length_m": 6.2, "width_m": 1.9, "height_m": 1.4,
-      "platform_h": 0.0, "weight_t": 3.2,
-      "feed_h": 1.4, "discharge_h": 0.3,
-      "confirmed": false, "note": "[TBC]"
-    },
-    "1600x6000": {
-      "length_m": 6.8, "width_m": 2.1, "height_m": 1.5,
-      "platform_h": 0.0, "weight_t": 4.0,
-      "feed_h": 1.5, "discharge_h": 0.3,
-      "confirmed": false, "note": "[TBC]"
+    "1300x5600": {
+      "label": "VGF 1.3m x 5.6m",
+      "length_m": 6.4, "width_m": 1.8, "height_m": 1.3,
+      "platform_h": 0.0, "weight_t": 3.8,
+      "feed_h": 1.3, "discharge_h": 0.3,
+      "tph_range": [280, 650],
+      "confirmed": false,
+      "note": "Used in 300 TPH and 600 TPH 3-stage PFDs. Feed 0-650/750mm."
     }
   },
   "JAW": {
-    "20x12": {
-      "length_m": 2.6, "width_m": 1.8, "height_m": 2.0,
-      "platform_h": 0.0, "weight_t": 7.0,
-      "feed_h": 2.0, "discharge_h": 1.83,
-      "confirmed": false, "note": "[TBC] Discharge default 1.83m (6ft)"
-    },
-    "30x20": {
-      "length_m": 3.4, "width_m": 2.4, "height_m": 2.6,
+    "PROJaw_3624": {
+      "label": "PROJaw 3624",
+      "length_m": 3.2, "width_m": 2.2, "height_m": 2.4,
       "platform_h": 0.0, "weight_t": 14.0,
-      "feed_h": 2.6, "discharge_h": 1.83,
-      "confirmed": false, "note": "[TBC]"
+      "feed_h": 2.4, "discharge_h": 1.83,
+      "tph_range": [80, 180],
+      "jaw_opening_mm": "900x600",
+      "css_range_mm": [80, 130],
+      "confirmed": false,
+      "note": "Used in 150 TPH 2-stage & 3-stage. CSS 110mm for granite."
     },
-    "42x30": {
+    "PROJaw_4230": {
+      "label": "PROJaw 4230 (42x30)",
       "length_m": 4.2, "width_m": 3.0, "height_m": 3.2,
       "platform_h": 0.0, "weight_t": 32.0,
       "feed_h": 3.2, "discharge_h": 1.83,
-      "confirmed": false, "note": "[TBC]"
+      "tph_range": [180, 380],
+      "jaw_opening_mm": "1065x760",
+      "css_range_mm": [100, 180],
+      "confirmed": false,
+      "note": "Used in 250 TPH (CSS 110-127mm) and 300 TPH limestone (CSS 152mm). Versatile mid-range jaw."
     },
-    "50x40": {
-      "length_m": 5.0, "width_m": 3.6, "height_m": 3.8,
-      "platform_h": 0.0, "weight_t": 55.0,
-      "feed_h": 3.8, "discharge_h": 1.83,
-      "confirmed": false, "note": "[TBC]"
+    "PROJaw_49x38": {
+      "label": "PROJaw 49x38 (Hcy-1250x950)",
+      "length_m": 5.2, "width_m": 3.8, "height_m": 4.0,
+      "platform_h": 0.0, "weight_t": 58.0,
+      "feed_h": 4.0, "discharge_h": 1.83,
+      "tph_range": [380, 700],
+      "jaw_opening_mm": "1245x965",
+      "css_range_mm": [100, 175],
+      "confirmed": false,
+      "note": "Used in 600 TPH 3-stage (Gabro). Hydraulic jaw (Hcy). CSS 125mm. Feed 0-750mm."
     }
   },
   "CONE": {
-    "2500": {
-      "length_m": 2.8, "width_m": 2.8, "height_m": 2.5,
-      "platform_h": 4.5, "weight_t": 9.0,
-      "feed_h": 1.0, "discharge_h": 0.5,
-      "confirmed": false, "note": "[TBC] Platform height = top of structure the cone sits on"
-    },
-    "3510": {
+    "PROCone_3510": {
+      "label": "PROCone-3510",
       "length_m": 3.4, "width_m": 3.4, "height_m": 3.0,
       "platform_h": 5.0, "weight_t": 16.0,
       "feed_h": 1.0, "discharge_h": 0.5,
-      "confirmed": false, "note": "[TBC]"
+      "tph_range": [100, 200],
+      "css_range_mm": [22, 38],
+      "confirmed": false,
+      "note": "Used in 150 TPH 2-stage (CSS 32) and 3-stage (CSS 28). Secondary stage."
     },
-    "4510": {
+    "PROCone_4510": {
+      "label": "PROCone-4510",
       "length_m": 4.0, "width_m": 4.0, "height_m": 3.5,
       "platform_h": 5.5, "weight_t": 25.0,
       "feed_h": 1.0, "discharge_h": 0.5,
-      "confirmed": false, "note": "[TBC]"
+      "tph_range": [180, 320],
+      "css_range_mm": [22, 44],
+      "confirmed": false,
+      "note": "Used in 250 TPH 2-stage (CSS 30) and 3-stage (CSS 32). Mid-range secondary cone."
     },
-    "H6800": {
-      "length_m": 4.8, "width_m": 4.8, "height_m": 4.2,
-      "platform_h": 6.0, "weight_t": 50.0,
+    "PROCone_5010": {
+      "label": "PROCone-5010",
+      "length_m": 4.6, "width_m": 4.6, "height_m": 4.0,
+      "platform_h": 6.0, "weight_t": 38.0,
       "feed_h": 1.0, "discharge_h": 0.5,
-      "confirmed": false, "note": "[TBC] Metso H6800"
+      "tph_range": [280, 400],
+      "css_range_mm": [22, 44],
+      "confirmed": false,
+      "note": "Used in 300 TPH (CSS 34) and 600 TPH twin-cone (CSS 28, 2x400HP). Largest PROMAN cone."
     }
   },
   "VSI": {
-    "300": {
+    "REMco_VSI200": {
+      "label": "PROMAN REMco VSI-200",
+      "length_m": 1.8, "width_m": 1.8, "height_m": 1.5,
+      "platform_h": 5.0, "weight_t": 3.5,
+      "feed_h": 1.5, "discharge_h": 0.3,
+      "tph_range": [80, 150],
+      "feed_size_max_mm": 30,
+      "confirmed": false,
+      "note": "Tertiary VSI. Used in 150 TPH 3-stage. 110 mt/h input in tertiary-only config. Feed 0-30mm."
+    },
+    "REMco_VSI300": {
+      "label": "PROMAN REMco VSI-300",
       "length_m": 2.0, "width_m": 2.0, "height_m": 1.8,
       "platform_h": 5.0, "weight_t": 4.5,
       "feed_h": 1.8, "discharge_h": 0.3,
-      "confirmed": false, "note": "[TBC] REMCO VSI-300"
+      "tph_range": [150, 280],
+      "feed_size_max_mm": 40,
+      "confirmed": false,
+      "note": "Tertiary VSI. Used in 250 TPH 3-stage and tertiary-only VSI-300 config (200 mt/h basalt). Feed 0-40mm."
     },
-    "4000": {
-      "length_m": 2.4, "width_m": 2.4, "height_m": 2.2,
+    "REMco_VSI4060": {
+      "label": "PROMAN REMco VSI-4060",
+      "length_m": 2.4, "width_m": 2.4, "height_m": 2.0,
       "platform_h": 5.5, "weight_t": 7.0,
-      "feed_h": 2.2, "discharge_h": 0.3,
-      "confirmed": false, "note": "[TBC] REMCO VSI-4000"
+      "feed_h": 2.0, "discharge_h": 0.3,
+      "tph_range": [260, 380],
+      "feed_size_max_mm": 45,
+      "motor_hp": "2x300",
+      "confirmed": false,
+      "note": "Tertiary VSI. Used in 300 TPH 3-stage (limestone). 2x300 HP motors."
     },
-    "5080": {
+    "REMco_VSI5080": {
+      "label": "PROMAN REMco VSI-5080",
       "length_m": 2.8, "width_m": 2.8, "height_m": 2.5,
       "platform_h": 6.0, "weight_t": 10.0,
       "feed_h": 2.5, "discharge_h": 0.3,
-      "confirmed": false, "note": "[TBC] REMCO VSI-5080"
+      "tph_range": [380, 700],
+      "feed_size_max_mm": 50,
+      "motor_hp": "2x400",
+      "confirmed": false,
+      "note": "Tertiary VSI. Used in 600 TPH 3-stage and tertiary-only VSI-5080 config (600 mt/h granite). 2x400 HP. Feed 0-50mm."
     }
   },
   "SCREEN": {
-    "1500x4000_2d": {
-      "length_m": 4.8, "width_m": 2.2, "height_m": 1.8,
-      "platform_h": 3.0, "weight_t": 4.5,
+    "1200x4000_3d": {
+      "label": "Screen 1.2m x 4.0m 3-Deck",
+      "length_m": 4.8, "width_m": 1.8, "height_m": 1.8,
+      "platform_h": 3.5, "weight_t": 4.0,
       "feed_h": 1.8, "discharge_h": 0.5,
-      "confirmed": false, "note": "[TBC] 2-deck"
+      "confirmed": false,
+      "note": "Intermediate screen in 150 TPH 3-stage."
     },
     "2000x5000_3d": {
+      "label": "Screen 2.0m x 5.0m 3-Deck",
       "length_m": 5.8, "width_m": 2.8, "height_m": 2.2,
       "platform_h": 3.5, "weight_t": 7.0,
       "feed_h": 2.2, "discharge_h": 0.5,
-      "confirmed": false, "note": "[TBC] 3-deck"
+      "confirmed": false,
+      "note": "Intermediate screen in 300 TPH 3-stage."
+    },
+    "2000x5000_4d": {
+      "label": "Screen 2.0m x 5.0m 4-Deck",
+      "length_m": 5.8, "width_m": 2.8, "height_m": 2.4,
+      "platform_h": 3.5, "weight_t": 8.0,
+      "feed_h": 2.4, "discharge_h": 0.5,
+      "confirmed": false,
+      "note": "Final screen in 150 TPH 3-stage."
     },
     "2000x6000_4d": {
+      "label": "Screen 2.0m x 6.0m 4-Deck",
       "length_m": 6.8, "width_m": 2.8, "height_m": 2.4,
       "platform_h": 4.0, "weight_t": 9.0,
       "feed_h": 2.4, "discharge_h": 0.5,
-      "confirmed": false, "note": "[TBC] 4-deck"
+      "confirmed": false,
+      "note": "Used in 150 TPH 2-stage (final), 250 TPH 3-stage (intermediate), and tertiary VSI-200/VSI-300 configs."
+    },
+    "2000x7000_4d": {
+      "label": "Screen 2.0m x 7.0m 4-Deck",
+      "length_m": 7.8, "width_m": 2.8, "height_m": 2.6,
+      "platform_h": 4.0, "weight_t": 11.0,
+      "feed_h": 2.6, "discharge_h": 0.5,
+      "confirmed": false,
+      "note": "Final screen in 300 TPH 3-stage (limestone)."
+    },
+    "2400x8100_3d": {
+      "label": "Screen 2.4m x 8.1m 3-Deck",
+      "length_m": 9.0, "width_m": 3.2, "height_m": 2.8,
+      "platform_h": 4.5, "weight_t": 16.0,
+      "feed_h": 2.8, "discharge_h": 0.5,
+      "confirmed": false,
+      "note": "Used in 600 TPH 3-stage (×2 intermediate, ×2 final). Also tertiary VSI-5080 config."
     }
   },
   "WSG": {
-    "70": {
+    "WSG70": {
+      "label": "ORTNER WSG-70 (Wet Sand Plant)",
       "length_m": 8.0, "width_m": 4.5, "height_m": 5.5,
       "platform_h": 0.0, "weight_t": 18.0,
       "feed_h": 5.5, "discharge_h": 0.5,
-      "confirmed": false, "note": "[TBC] ORTNER WSG-70 including sump, pump"
+      "confirmed": false,
+      "note": "Wet sand washing add-on. Requires sump, pump, water supply."
     }
   },
   "MVF": {
-    "100-160": {
-      "length_m": 4.2, "width_m": 1.4, "height_m": 1.0,
+    "MVF_100160": {
+      "label": "Mechanical Feeder 1.0m x 1.6m",
+      "length_m": 2.2, "width_m": 1.4, "height_m": 1.0,
       "platform_h": 0.0, "weight_t": 1.8,
       "feed_h": 1.0, "discharge_h": 0.4,
-      "confirmed": false, "note": "[TBC]"
+      "confirmed": false,
+      "note": "Surge-bin discharge feeder. Seen in 250 TPH 3-stage (2 units: 1.0x1.6m each)."
     }
   }
 }

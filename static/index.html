@@ -454,6 +454,7 @@ function renderQuoteResult(d, req) {
   <div class="btn-row">
     <button class="btn btn-green" onclick="downloadXlsx()">⬇ Price Schedule (.xlsx)</button>
     <button class="btn btn-navy" onclick="downloadDocx()">⬇ Offer Letter (.docx)</button>
+    <button class="btn btn-outline" onclick="open3DLayout()">🏗️ 3D Plant Layout</button>
   </div>
 
   <!-- Tabs -->
@@ -545,6 +546,13 @@ async function downloadStandaloneDocx() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a'); a.href=url; a.download='StandaloneOffer.docx';
   a.click();
+}
+
+function open3DLayout() {
+  if (!lastQuoteReq) { alert('Generate a quote first, then click 3D Plant Layout.'); return; }
+  const p = lastQuoteReq;
+  const q = `tph=${p.tph}&stages=${p.stages}&material=${encodeURIComponent(p.material||'Granite')}`;
+  window.open(`/layout3d?${q}`, '_blank');
 }
 
 function resetForm() {
