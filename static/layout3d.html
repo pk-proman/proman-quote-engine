@@ -94,7 +94,7 @@ body{background:#0d1117;color:#c9d1d9;font-family:'Segoe UI',system-ui,sans-seri
 <div id="tooltip"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 <script>
 'use strict';
 
@@ -160,15 +160,21 @@ function init() {
 }
 
 function buildControls(cam) {
-  if (controls) controls.dispose();
-  controls = new THREE.OrbitControls(cam, renderer.domElement);
-  controls.enableDamping = true;
-  controls.dampingFactor = 0.07;
-  controls.minDistance = 2;
-  controls.maxDistance = 400;
-  controls.maxPolarAngle = Math.PI * 0.88;
-  controls.target.set(plantLen / 2, 4, 0);
-  controls.update();
+  if (controls && controls.dispose) controls.dispose();
+  if (typeof THREE.OrbitControls !== 'undefined') {
+    controls = new THREE.OrbitControls(cam, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.07;
+    controls.minDistance = 2;
+    controls.maxDistance = 400;
+    controls.maxPolarAngle = Math.PI * 0.88;
+    controls.target.set(plantLen / 2, 4, 0);
+    controls.update();
+  } else {
+    // Fallback stub — scene still renders, just no mouse interaction
+    controls = { update(){}, dispose(){}, enableRotate:true, target: new THREE.Vector3(plantLen/2,4,0) };
+    console.warn('OrbitControls not loaded — mouse interaction disabled');
+  }
 }
 
 function addGround() {
@@ -735,8 +741,15 @@ async function load() {
   }
 }
 
-init();
-load();
+function showFatalError(msg) {
+  document.getElementById('loading').innerHTML =
+    `<div style="color:#f87171;font-size:13px;max-width:320px;line-height:1.6">
+      <b>⚠ Failed to load 3D viewer</b><br>${msg}<br>
+      <span style="color:#5a7a9a;font-size:11px">Open browser DevTools (F12 → Console) for details.</span>
+    </div>`;
+}
+try { init(); } catch(e) { showFatalError('3D init error: ' + e.message); console.error('init() threw:', e); }
+load().catch(e => showFatalError('Data load error: ' + e.message));
 </script>
 </body>
 </html>
