@@ -180,11 +180,12 @@ def select_vsi(tph_into_vsi: float) -> dict:
             "tph_capacity": 262,
         }
     elif tph_into_vsi <= 380:
+        # Layout (300 TPH plant) confirms 2×250HP for VSI-4060
         return {
             "model": "PROMAN REMco VSI-4060",
             "footprint_key": "REMco_VSI4060",
             "max_feed_mm": 45,
-            "motor_hp": "2x300 HP",
+            "motor_hp": "2x250 HP",
             "tph_capacity": 380,
         }
     else:
@@ -223,9 +224,10 @@ def select_screens(tph: float, stages: int, material: str = "granite") -> dict:
                 "final":        {"model": "Screen 2.0m x 5.0m 4-Deck", "footprint_key": "2000x5000_4d", "decks": 4},
             }
         elif tph <= 280:
+            # PFD evidence (250 TPH Basalt 3-Stage): intermediate=1.2m×4m-3D (pre-VSI), final=2m×6m-4D
             return {
-                "intermediate": {"model": "Screen 2.0m x 6.0m 4-Deck", "footprint_key": "2000x6000_4d", "decks": 4},
-                "final":        {"model": "Screen 1.2m x 4.0m 3-Deck",  "footprint_key": "1200x4000_3d", "decks": 3},
+                "intermediate": {"model": "Screen 1.2m x 4.0m 3-Deck", "footprint_key": "1200x4000_3d", "decks": 3},
+                "final":        {"model": "Screen 2.0m x 6.0m 4-Deck",  "footprint_key": "2000x6000_4d", "decks": 4},
             }
         elif tph <= 380:
             return {

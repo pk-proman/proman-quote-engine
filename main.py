@@ -33,6 +33,7 @@ from erpnext_bridge import (parse_lead_payload, push_quote_to_lead,
                              fetch_lead, list_new_leads)
 import masters_manager as mm
 from equipment_selector import build_equipment_schedule
+from procurement_bom import build_procurement_bom
 
 # ---------------------------------------------------------------------------
 app = FastAPI(title="PROMAN Quotation Engine", version="1.0.0")
@@ -554,8 +555,8 @@ def _build_bom(schedule: dict, positions: list) -> list:
             "category":item["category"],"description":item["label"],
             "model":item["model"],"qty":qty,"specs":item.get("specs","")})
         sl += 1
-    # Conveyors
-    conv_count = {1:5,2:8,3:12}.get(schedule["stages"],8)
+    # Conveyors — calibrated from PROMAN layout drawings (3-stage = 16 belts)
+    conv_count = {1:6,2:12,3:16}.get(schedule["stages"],12)
     bom.append({"sl":sl,"stage":"Conveyor System","category":"CONVEYOR",
         "description":"Belt Conveyor (various)","model":"Rubber Belt Conveyor",
         "qty":conv_count,"specs":"Width: 600/800/1000mm"})
@@ -571,12 +572,14 @@ async def get_3d_layout_data(
     tph: int, stages: int = 2, material: str = "Granite",
     _: dict = Depends(require_login)
 ):
-    """Return equipment schedule with 3D positions for the plant layout viewer."""
+    """Return equipment schedule with 3D positions and deep procurement BOM."""
     schedule = build_equipment_schedule(tph, stages, material)
     positions = _compute_plant_positions(schedule)
     bom = _build_bom(schedule, positions)
+    proc_bom = build_procurement_bom(schedule, tph, stages)
     return {"tph": tph, "stages": stages, "material": material,
             "schedule": schedule, "positions": positions, "bom": bom,
+            "procurement_bom": proc_bom,
             "plant_length_m": schedule.get("_plant_length_m", 0)}
 
 
@@ -585,66 +588,199 @@ async def download_bom_excel(
     tph: int, stages: int = 2, material: str = "Granite", client: str = "Client",
     _: dict = Depends(require_login)
 ):
-    """Download BOM as Excel file."""
+    """Download deep multi-sheet procurement BOM as Excel."""
     import openpyxl
     from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 
     schedule = build_equipment_schedule(tph, stages, material)
-    positions = _compute_plant_positions(schedule)
-    bom = _build_bom(schedule, positions)
+    proc = build_procurement_bom(schedule, tph, stages)
 
     wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "BOM"
 
-    navy = PatternFill("solid", fgColor="1F3864")
-    hdr_font = Font(color="FFFFFF", bold=True, size=10)
-    thin = Side(style="thin", color="D1DCE8")
-    bdr = Border(left=thin, right=thin, top=thin, bottom=thin)
+    navy_hex  = "1F3864"
+    green_hex = "1E4620"
+    navy  = PatternFill("solid", fgColor=navy_hex)
+    green = PatternFill("solid", fgColor=green_hex)
+    wht   = Font(color="FFFFFF", bold=True, size=10)
+    thin  = Side(style="thin", color="CBD5E1")
+    bdr   = Border(left=thin, right=thin, top=thin, bottom=thin)
 
-    # Title block
-    ws.merge_cells("A1:G1")
-    ws["A1"] = f"PROMAN — Bill of Materials | {client} | {tph} TPH {stages}-Stage | {material}"
-    ws["A1"].font = Font(bold=True, size=12, color="1F3864")
-    ws["A1"].alignment = Alignment(horizontal="center")
-    ws.row_dimensions[1].height = 22
+    CAT_COLOR = {
+        "HOPPER":"FEF3C7","VGF":"FEF3C7","JAW":"FEE2E2","CONE":"DBEAFE",
+        "VSI":"EDE9FE","SCREEN":"D1FAE5","BIN":"F8FAFC","CONVEYOR":"FFF7ED",
+        "FEEDER":"FFF7ED","MOTOR":"E0F2FE","DRIVE":"E0F2FE","LUBE":"FEF3C7",
+        "ELECTRICAL":"EDE9FE","INSTRUMENT":"E0F2FE",
+        "WEAR_PARTS":"FEF2F2","CONSUMABLE":"FFF7ED","STRUCTURAL":"F0FDF4",
+    }
 
-    headers = ["Sl","Stage","Category","Description","Model","Qty","Specs / Notes"]
-    for ci, h in enumerate(headers, 1):
-        cell = ws.cell(row=2, column=ci, value=h)
-        cell.fill = navy; cell.font = hdr_font
-        cell.alignment = Alignment(horizontal="center", vertical="center")
-        cell.border = bdr
-    ws.row_dimensions[2].height = 18
+    def col_letter(n): return chr(64 + n)
 
-    cat_colors = {"HOPPER":"FEF3C7","VGF":"FDE68A","JAW":"FEE2E2","CONE":"DBEAFE",
-                  "VSI":"EDE9FE","SCREEN":"D1FAE5","BIN":"F3F4F6",
-                  "CONVEYOR":"FEF3C7","ELECTRICAL":"E0E7FF"}
-    widths = [5, 28, 14, 32, 28, 6, 40]
-    for ci, w in enumerate(widths, 1): ws.column_dimensions[chr(64+ci)].width = w
+    def write_title(ws, title, cols):
+        ws.merge_cells(f"A1:{col_letter(cols)}1")
+        ws["A1"] = title
+        ws["A1"].font = Font(bold=True, size=12, color=navy_hex)
+        ws["A1"].alignment = Alignment(horizontal="center", vertical="center")
+        ws.row_dimensions[1].height = 24
 
-    for row_i, item in enumerate(bom, 3):
-        vals = [item["sl"],item["stage"],item["category"],item["description"],
-                item["model"],item["qty"],item["specs"]]
-        fill_color = cat_colors.get(item["category"], "FFFFFF")
-        fill = PatternFill("solid", fgColor=fill_color)
-        for ci, v in enumerate(vals, 1):
-            cell = ws.cell(row=row_i, column=ci, value=v)
-            cell.fill = fill; cell.border = bdr
-            cell.alignment = Alignment(wrap_text=True, vertical="center")
-            if ci in (1,6): cell.alignment = Alignment(horizontal="center", vertical="center")
-        ws.row_dimensions[row_i].height = 16
+    def write_headers(ws, headers, row=2, fill=navy):
+        for ci, h in enumerate(headers, 1):
+            c = ws.cell(row=row, column=ci, value=h)
+            c.fill = fill; c.font = wht
+            c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            c.border = bdr
+        ws.row_dimensions[row].height = 20
 
-    # Footer
-    footer_row = len(bom) + 4
-    ws.cell(row=footer_row, column=1, value="Note: Dimensions & specs are indicative. Confirm with PROMAN engineering before ordering.")
-    ws.cell(row=footer_row, column=1).font = Font(italic=True, size=9, color="6B7A90")
+    def write_rows(ws, rows, start_row, color_key_col=None, color_map=None):
+        for ri, row in enumerate(rows, start_row):
+            cat = row.get("category","")
+            bg  = (color_map or CAT_COLOR).get(cat, "FFFFFF")
+            fill = PatternFill("solid", fgColor=bg)
+            for ci, v in enumerate(row.values(), 1):
+                c = ws.cell(row=ri, column=ci, value=v)
+                c.fill = fill; c.border = bdr
+                c.alignment = Alignment(wrap_text=True, vertical="center")
+            ws.row_dimensions[ri].height = 15
 
-    out = TMP / f"BOM_{client}_{tph}TPH_{stages}STG.xlsx"
+    def freeze_and_autofit(ws, freeze="A3"):
+        ws.freeze_panes = freeze
+
+    note_font = Font(italic=True, size=9, color="64748B")
+
+    # ── SHEET 0: COVER ──────────────────────────────────────────────
+    ws0 = wb.active; ws0.title = "Cover"
+    stats = proc["summary_stats"]
+    rows_cover = [
+        ("PROMAN — Deep Procurement BOM",""),
+        (f"Client","  {client}"),
+        (f"Capacity","  {tph} TPH"),
+        (f"Stages","  {stages}-Stage"),
+        (f"Material","  {material}"),
+        ("",""),
+        ("Total Structural Steel",f"  {stats['total_structural_mt']} MT"),
+        ("Belt Width",f"  {stats['belt_width_mm']}mm"),
+        ("Conveyor Count",f"  {stats['conveyor_count']} belts"),
+        ("Est. Connected Load",f"  {int(stats['est_connected_kw'])} kW"),
+        ("",""),
+        ("Sheets","  1-Manufactured | 2-Bought-Out | 3-Wear Parts | 4-Consumables | 5-Structural | 6-Conveyor Components"),
+        ("Note","  All quantities are indicative. Confirm with PROMAN Engineering."),
+    ]
+    ws0.column_dimensions["A"].width = 28
+    ws0.column_dimensions["B"].width = 70
+    ws0.merge_cells("A1:B1")
+    ws0["A1"] = "PROMAN — Deep Procurement Bill of Materials"
+    ws0["A1"].font = Font(bold=True, size=14, color=navy_hex)
+    ws0["A1"].alignment = Alignment(horizontal="center"); ws0.row_dimensions[1].height = 28
+    for ri, (k, v) in enumerate(rows_cover[1:], 2):
+        ws0.cell(row=ri, column=1, value=k).font = Font(bold=True, size=11)
+        ws0.cell(row=ri, column=2, value=v).font  = Font(size=11)
+        ws0.row_dimensions[ri].height = 16
+
+    # ── SHEET 1: MANUFACTURED ───────────────────────────────────────
+    ws1 = wb.create_sheet("1-Manufactured")
+    hdrs = ["Sl","Category","Description","Model / Spec","Qty","Unit","Technical Specs"]
+    write_title(ws1, f"Main Manufactured Equipment — {tph}TPH {stages}-Stage | {material}", len(hdrs))
+    write_headers(ws1, hdrs)
+    for ri, item in enumerate(proc["manufactured"], 3):
+        vals = [item["sl"],item["category"],item["description"],item["model"],item["qty"],item["unit"],item["specs"]]
+        bg = CAT_COLOR.get(item["category"],"FFFFFF")
+        fill = PatternFill("solid",fgColor=bg)
+        for ci,v in enumerate(vals,1):
+            c=ws1.cell(row=ri,column=ci,value=v); c.fill=fill; c.border=bdr
+            c.alignment=Alignment(wrap_text=True,vertical="center")
+        ws1.row_dimensions[ri].height=15
+    for w,col in zip([5,14,32,28,6,8,50],range(1,8)): ws1.column_dimensions[col_letter(col)].width=w
+    freeze_and_autofit(ws1)
+
+    # ── SHEET 2: BOUGHT-OUT ─────────────────────────────────────────
+    ws2 = wb.create_sheet("2-Bought-Out")
+    hdrs2 = ["Sl","Category","Description","Model / Spec","Qty","Unit","Technical Specs"]
+    write_title(ws2, f"Bought-Out Items (Motors, Drives, Electrical) — {tph}TPH {stages}-Stage", len(hdrs2))
+    write_headers(ws2, hdrs2)
+    for ri, item in enumerate(proc["bought_out"], 3):
+        vals = [item["sl"],item["category"],item["description"],item["model"],item["qty"],item["unit"],item["specs"]]
+        bg = CAT_COLOR.get(item["category"],"FFFFFF")
+        fill = PatternFill("solid",fgColor=bg)
+        for ci,v in enumerate(vals,1):
+            c=ws2.cell(row=ri,column=ci,value=v); c.fill=fill; c.border=bdr
+            c.alignment=Alignment(wrap_text=True,vertical="center")
+        ws2.row_dimensions[ri].height=15
+    for w,col in zip([5,14,32,28,6,8,55],range(1,8)): ws2.column_dimensions[col_letter(col)].width=w
+    freeze_and_autofit(ws2)
+
+    # ── SHEET 3: WEAR PARTS ─────────────────────────────────────────
+    ws3 = wb.create_sheet("3-Wear Parts")
+    hdrs3 = ["Sl","Equipment","Wear Item","Material Spec","Qty","Unit","Wt (kg)","Life (hrs)","Notes"]
+    write_title(ws3, f"Wear Parts — Initial Supply (2 Sets) — {tph}TPH {stages}-Stage | {material}", len(hdrs3))
+    write_headers(ws3, hdrs3)
+    for ri, item in enumerate(proc["wear_parts"], 3):
+        vals = [item["sl"],item["equipment"],item["item"],item["material"],
+                item["qty"],item["unit"],item["wt_kg"],item["life_hrs"],item["note"]]
+        bg = "FEF2F2"
+        fill = PatternFill("solid",fgColor=bg)
+        for ci,v in enumerate(vals,1):
+            c=ws3.cell(row=ri,column=ci,value=v); c.fill=fill; c.border=bdr
+            c.alignment=Alignment(wrap_text=True,vertical="center")
+        ws3.row_dimensions[ri].height=14
+    for w,col in zip([5,18,32,24,6,8,10,12,28],range(1,10)): ws3.column_dimensions[col_letter(col)].width=w
+    freeze_and_autofit(ws3)
+
+    # ── SHEET 4: CONSUMABLES ────────────────────────────────────────
+    ws4 = wb.create_sheet("4-Consumables")
+    hdrs4 = ["Sl","Item","Material / Grade","Qty","Unit","Notes"]
+    write_title(ws4, f"Consumables (Lubricants, Filters, Seals) — {tph}TPH {stages}-Stage", len(hdrs4))
+    write_headers(ws4, hdrs4)
+    for ri, item in enumerate(proc["consumables"], 3):
+        vals = [item["sl"],item["item"],item["material"],item["qty"],item["unit"],item["note"]]
+        bg = "FFF7ED"
+        fill = PatternFill("solid",fgColor=bg)
+        for ci,v in enumerate(vals,1):
+            c=ws4.cell(row=ri,column=ci,value=v); c.fill=fill; c.border=bdr
+            c.alignment=Alignment(wrap_text=True,vertical="center")
+        ws4.row_dimensions[ri].height=14
+    for w,col in zip([5,42,28,8,10,38],range(1,7)): ws4.column_dimensions[col_letter(col)].width=w
+    freeze_and_autofit(ws4)
+
+    # ── SHEET 5: STRUCTURAL STEEL ───────────────────────────────────
+    ws5 = wb.create_sheet("5-Structural")
+    hdrs5 = ["Sl","Section","Item","Profile / Grade","Qty","Unit","Notes"]
+    write_title(ws5, f"Structural Steel & Fabrication — Est. {stats['total_structural_mt']} MT Total | {tph}TPH {stages}-Stage", len(hdrs5))
+    write_headers(ws5, hdrs5)
+    for ri, item in enumerate(proc["structural"], 3):
+        vals = [item["sl"],item["section"],item["item"],item["profile"],item["qty_mt"],item["unit"],item.get("note","")]
+        bg = "F0FDF4"
+        fill = PatternFill("solid",fgColor=bg)
+        for ci,v in enumerate(vals,1):
+            c=ws5.cell(row=ri,column=ci,value=v); c.fill=fill; c.border=bdr
+            c.alignment=Alignment(wrap_text=True,vertical="center")
+        ws5.row_dimensions[ri].height=14
+    for w,col in zip([5,30,32,24,10,8,32],range(1,8)): ws5.column_dimensions[col_letter(col)].width=w
+    freeze_and_autofit(ws5)
+
+    # ── SHEET 6: CONVEYOR COMPONENTS ────────────────────────────────
+    ws6 = wb.create_sheet("6-Conveyor")
+    hdrs6 = ["Sl","Conveyor","Component","Qty","Unit","Notes"]
+    write_title(ws6, f"Conveyor Components (Per Conveyor Breakdown) — {stats['conveyor_count']} Conveyors | {stats['belt_width_mm']}mm belt", len(hdrs6))
+    write_headers(ws6, hdrs6)
+    prev_conv = None
+    for ri, item in enumerate(proc["conveyor_components"], 3):
+        is_new = item["conveyor"] != prev_conv
+        bg = "FFF7ED" if not is_new else "FED7AA"
+        fill = PatternFill("solid",fgColor=bg)
+        vals = [item["sl"],item["conveyor"],item["item"],item["qty"],item["unit"],item["note"]]
+        for ci,v in enumerate(vals,1):
+            c=ws6.cell(row=ri,column=ci,value=v); c.fill=fill; c.border=bdr
+            c.alignment=Alignment(wrap_text=True,vertical="center")
+        ws6.row_dimensions[ri].height=14
+        prev_conv = item["conveyor"]
+    for w,col in zip([5,32,42,8,8,28],range(1,7)): ws6.column_dimensions[col_letter(col)].width=w
+    freeze_and_autofit(ws6)
+
+    out = TMP / f"DeepBOM_{client}_{tph}TPH_{stages}STG.xlsx"
     wb.save(str(out))
-    filename = f"BOM_{client}_{tph}TPH_{stages}STG.xlsx"
-    return FileResponse(str(out), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+    filename = f"DeepBOM_{client}_{tph}TPH_{stages}STG.xlsx"
+    return FileResponse(str(out),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
 @app.get("/layout3d", response_class=HTMLResponse)
