@@ -401,12 +401,21 @@ function structColumns(cx, py, pw, pd) {
 }
 
 // ── Text sprite ────────────────────────────────────────────────────
+function rrect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.lineTo(x+w-r, y); ctx.arcTo(x+w,y,x+w,y+r,r);
+  ctx.lineTo(x+w, y+h-r); ctx.arcTo(x+w,y+h,x+w-r,y+h,r);
+  ctx.lineTo(x+r, y+h); ctx.arcTo(x,y+h,x,y+h-r,r);
+  ctx.lineTo(x, y+r); ctx.arcTo(x,y,x+r,y,r);
+  ctx.closePath();
+}
 function mkLabel(text) {
   const cv = document.createElement('canvas');
   cv.width = 280; cv.height = 64;
   const ctx = cv.getContext('2d');
   ctx.fillStyle = 'rgba(10,25,50,0.75)';
-  ctx.roundRect(2,2,276,60,8); ctx.fill();
+  rrect(ctx,2,2,276,60,8); ctx.fill();
   ctx.fillStyle = '#7eb9f5';
   ctx.font = 'bold 20px Arial';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -691,8 +700,18 @@ function animate() {
 async function load() {
   try {
     const url=`/api/layout/3d-data?tph=${TPH}&stages=${STAGES}&material=${encodeURIComponent(MAT)}`;
-    const resp=await fetch(url,{credentials:'include'});
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const ctrl = new AbortController();
+    const tid = setTimeout(()=>ctrl.abort(), 30000);
+    const resp=await fetch(url,{credentials:'include', signal:ctrl.signal});
+    clearTimeout(tid);
+    if (!resp.ok) {
+      // If redirected to login, show auth error
+      const ct = resp.headers.get('content-type')||'';
+      if (resp.status===401 || resp.status===403 || resp.url.includes('/login'))
+        throw new Error(`Not authenticated (HTTP ${resp.status}) — please reload and log in again`);
+      const body = ct.includes('json') ? (await resp.json()).detail : await resp.text();
+      throw new Error(`HTTP ${resp.status}: ${body||'Server error'}`);
+    }
     const data=await resp.json();
     plantLen = data.plant_length_m||80;
 
