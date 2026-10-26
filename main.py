@@ -454,22 +454,52 @@ async def masters_ui(current_user: dict = Depends(require_admin)):
 # 3D LAYOUT + BOM ENDPOINTS
 # ---------------------------------------------------------------------------
 
-def _compute_plant_positions(schedule: dict) -> list:
-    """Compute 3D positions (x,y,z) and visual properties for each equipment item."""
+def _compute_plant_positions(schedule: dict, spec: "PlantSpec | None" = None) -> list:
+    """
+    Compute 3D positions (x,y,z) and visual properties for each equipment item.
+    When `spec` is provided, platform elevations are read from PlantSpec geometry
+    fields so the 3D view stays consistent with the cost engine.
+    """
     items = []
-    x = 0.0
+    x     = 0.0
     stages = schedule["stages"]
+
+    # ── Resolve elevations ──────────────────────────────────────────────────
+    # Prefer spec fields; fall back to sensible fixed defaults so the viewer
+    # works even when called from the generic /api/layout/3d-data endpoint
+    # (which doesn't have a pre-configured PlantSpec).
+    def _el(attr: str, default: float) -> float:
+        return getattr(spec, attr, default) if spec else default
+
+    el_cone    = _el("elevation_cone",      5.5)
+    el_prescrn = _el("elevation_prescreen", 5.0)
+    el_surge2  = _el("elevation_surge2",    3.0)
+    el_vsi     = _el("elevation_vsi",       7.5)
+    el_screen  = _el("elevation_screen",    4.5)
+
+    # ── Horizontal spacing ──────────────────────────────────────────────────
+    def _sp(attr: str, default: float) -> float:
+        if spec:
+            v = getattr(spec, attr, None)
+            return v if v is not None else default
+        return default
+
+    dx_h2j   = _sp("spacing_hopper_to_jaw",   8.0)
+    dx_j2c   = _sp("spacing_jaw_to_cone",      14.0)
+    dx_c2sc  = _sp("spacing_cone_to_screen",   12.0)
+    dx_c2v   = _sp("spacing_cone_to_vsi",      12.0)
+    dx_v2sc  = _sp("spacing_vsi_to_screen",    10.0)
 
     # ROM Hopper
     items.append({"id":"hopper","category":"HOPPER","label":"ROM Hopper",
-        "model":"40T Surge Hopper","pos":[x,0,0],"size":[3.5,5,4.5],
+        "model":"40T Surge Hopper","pos":[x, 0, 0],"size":[3.5, 5, 4.5],
         "color":"#D97706","stage":0,"elevation":0,"bom_include":False})
-    x += 5
+    x += dx_h2j
 
     # VGF
     vgf = schedule["vgf"]
     items.append({"id":"vgf","category":"VGF","label":vgf["model"],
-        "model":vgf["model"],"pos":[x,0.5,0],"size":[5,1,1.5],
+        "model":vgf["model"],"pos":[x, 0.5, 0],"size":[5, 1, 1.5],
         "color":"#F59E0B","stage":1,"elevation":0,"bom_include":True,
         "specs":f"Feed cap: {vgf.get('feed_capacity_mtph')} mt/h | Max feed: {vgf.get('max_feed_mm')}mm"})
     x += 10
@@ -477,14 +507,14 @@ def _compute_plant_positions(schedule: dict) -> list:
     # JAW
     jaw = schedule["jaw"]
     items.append({"id":"jaw","category":"JAW","label":jaw["model"],
-        "model":jaw["model"],"pos":[x,1.5,0],"size":[4,3,3],
+        "model":jaw["model"],"pos":[x, 1.5, 0],"size":[4, 3, 3],
         "color":"#DC2626","stage":1,"elevation":0,"bom_include":True,
         "specs":f"CSS: {jaw.get('css_mm')}mm"})
-    x += 14
+    x += dx_j2c
 
     # Surge Bin 1
     items.append({"id":"surge1","category":"BIN","label":"Surge Bin 1",
-        "model":"Surge Bin 30T","pos":[x,0,0],"size":[2.5,4,2.5],
+        "model":"Surge Bin 30T","pos":[x, 0, 0],"size":[2.5, 4, 2.5],
         "color":"#6B7280","stage":1,"elevation":0,"bom_include":True,
         "specs":"30T capacity"})
     x += 8
@@ -492,34 +522,34 @@ def _compute_plant_positions(schedule: dict) -> list:
     if schedule.get("cone"):
         cone = schedule["cone"]
         items.append({"id":"cone","category":"CONE","label":cone["model"],
-            "model":cone["model"],"pos":[x,5,0],"size":[3.5,3.5,3.5],
-            "color":"#2563EB","stage":2,"elevation":5,"bom_include":True,
+            "model":cone["model"],"pos":[x, el_cone, 0],"size":[3.5, 3.5, 3.5],
+            "color":"#2563EB","stage":2,"elevation":el_cone,"bom_include":True,
             "specs":f"CSS: {cone.get('css_mm')}mm {'| Twin unit' if cone.get('twin') else ''}"})
-        x += 14
+        x += dx_c2sc
 
         if stages >= 3 and schedule.get("vsi"):
             int_scr = (schedule["screens"] or {}).get("intermediate")
             if int_scr:
                 items.append({"id":"screen_int","category":"SCREEN",
                     "label":int_scr["model"],"model":int_scr["model"],
-                    "pos":[x,4.5,0],"size":[6,2,2.8],
-                    "color":"#059669","stage":2,"elevation":4,"bom_include":True,
+                    "pos":[x, el_prescrn, 0],"size":[6, 2, 2.8],
+                    "color":"#059669","stage":2,"elevation":el_prescrn,"bom_include":True,
                     "specs":f"{int_scr.get('decks',3)}-Deck intermediate"})
                 x += 12
 
             # Surge Bin 2
             items.append({"id":"surge2","category":"BIN","label":"Surge Bin 2",
-                "model":"Surge Bin 15T","pos":[x,2.5,0],"size":[2,3.5,2],
-                "color":"#6B7280","stage":2,"elevation":2,"bom_include":True,
+                "model":"Surge Bin 15T","pos":[x, el_surge2, 0],"size":[2, 3.5, 2],
+                "color":"#6B7280","stage":2,"elevation":el_surge2,"bom_include":True,
                 "specs":"15T capacity"})
             x += 7
 
             vsi = schedule["vsi"]
             items.append({"id":"vsi","category":"VSI","label":vsi["model"],
-                "model":vsi["model"],"pos":[x,5.5,0],"size":[2.8,2.5,2.8],
-                "color":"#7C3AED","stage":3,"elevation":5,"bom_include":True,
+                "model":vsi["model"],"pos":[x, el_vsi, 0],"size":[2.8, 2.5, 2.8],
+                "color":"#7C3AED","stage":3,"elevation":el_vsi,"bom_include":True,
                 "specs":f"Max feed: {vsi.get('max_feed_mm')}mm | {vsi.get('motor_hp','')} HP"})
-            x += 10
+            x += dx_v2sc
 
     # Final screen
     fin_scr = (schedule["screens"] or {}).get("final")
@@ -527,14 +557,14 @@ def _compute_plant_positions(schedule: dict) -> list:
         cuts = ", ".join(str(c) for c in schedule["gradation"]["cuts_mm"])
         items.append({"id":"screen_final","category":"SCREEN",
             "label":fin_scr["model"],"model":fin_scr["model"],
-            "pos":[x,4,0],"size":[7,2.4,2.8],
-            "color":"#059669","stage":stages,"elevation":3.5,"bom_include":True,
+            "pos":[x, el_screen, 0],"size":[7, 2.4, 2.8],
+            "color":"#059669","stage":stages,"elevation":el_screen,"bom_include":True,
             "specs":f"{fin_scr.get('decks',4)}-Deck | Cuts: {cuts}mm"})
         x += 12
 
     # Stockpile area marker
     items.append({"id":"stockpile","category":"STOCKPILE","label":"Product Stockpiles",
-        "model":"Conical Stockpile","pos":[x,0,0],"size":[8,0.1,12],
+        "model":"Conical Stockpile","pos":[x, 0, 0],"size":[8, 0.1, 12],
         "color":"#92400E","stage":stages,"elevation":0,"bom_include":False,
         "stockpile":True})
 

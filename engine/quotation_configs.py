@@ -23,7 +23,15 @@ from engine import PlantSpec
 # INDIVIDUAL CONFIGS
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# SITE GEOMETRY NOTES
+# All site_length_m / site_width_m values from PROMAN layout drawings (2026).
+# Elevation defaults in engine.py PlantSpec are used where layout not confirmed.
+# Spacing values (spacing_jaw_to_cone etc.) computed from layout drawing centroids.
+# ---------------------------------------------------------------------------
+
 # 1. 150 TPH  2-Stage  Granite / Basalt
+#    Site: estimated ~85 × 40m (no confirmed drawing)
 CFG_150_2S = PlantSpec(
     client_name  = "Enquiry Client",
     tph          = 150,
@@ -37,9 +45,15 @@ CFG_150_2S = PlantSpec(
     cone_model   = "3510",        # PFD: PROCone-3510, CSS 32mm
     vsi_model    = None,          # 2-stage — no VSI
     ref_no       = "PR/STD-26/150-2S",
+    # Geometry — estimated from proportional scaling
+    site_length_m = 85.0,
+    site_width_m  = 40.0,
+    elevation_cone   = 5.0,
+    elevation_screen = 4.0,
 )
 
 # 2. 150 TPH  3-Stage  Granite
+#    Site: estimated ~95 × 45m (no confirmed drawing)
 CFG_150_3S = PlantSpec(
     client_name  = "Enquiry Client",
     tph          = 150,
@@ -53,9 +67,18 @@ CFG_150_3S = PlantSpec(
     cone_model   = "3510",        # PFD: PROCone-3510, CSS 28mm
     vsi_model    = "200",         # PFD: REMco VSI-200
     ref_no       = "PR/STD-26/150-3S",
+    # Geometry — estimated
+    site_length_m  = 95.0,
+    site_width_m   = 45.0,
+    elevation_cone    = 5.5,
+    elevation_prescreen = 5.0,
+    elevation_surge2  = 3.0,
+    elevation_vsi     = 7.0,
+    elevation_screen  = 4.5,
 )
 
 # 3. 250 TPH  2-Stage  Granite
+#    Site: estimated ~100 × 45m
 CFG_250_2S = PlantSpec(
     client_name  = "Enquiry Client",
     tph          = 250,
@@ -69,9 +92,15 @@ CFG_250_2S = PlantSpec(
     cone_model   = "4510",        # PFD: PROCone-4510, CSS 30mm
     vsi_model    = None,          # 2-stage — no VSI
     ref_no       = "PR/STD-26/250-2S",
+    # Geometry — estimated
+    site_length_m = 100.0,
+    site_width_m  = 45.0,
+    elevation_cone   = 5.5,
+    elevation_screen = 4.5,
 )
 
 # 4. 250 TPH  3-Stage  Basalt
+#    Site: estimated ~110 × 50m
 CFG_250_3S = PlantSpec(
     client_name  = "Enquiry Client",
     tph          = 250,
@@ -85,11 +114,20 @@ CFG_250_3S = PlantSpec(
     cone_model   = "4510",        # PFD: PROCone-4510, CSS 32mm
     vsi_model    = "300",         # PFD: REMco VSI-300
     ref_no       = "PR/STD-26/250-3S",
+    # Geometry — estimated
+    site_length_m  = 110.0,
+    site_width_m   = 50.0,
+    elevation_cone    = 5.5,
+    elevation_prescreen = 5.0,
+    elevation_surge2  = 3.5,
+    elevation_vsi     = 7.5,
+    elevation_screen  = 4.5,
 )
 
 # 5. 300 TPH  3-Stage  Limestone
 #    VGF 1.2m confirmed by user (layout drawing). CSS 152.4mm for medium-hard material.
 #    VSI-4060 motor confirmed as 2×300HP per PFD (NOT 2×250HP).
+#    Site: 120 × 55m (confirmed from layout drawing)
 CFG_300_3S = PlantSpec(
     client_name  = "Enquiry Client",
     tph          = 300,
@@ -103,12 +141,31 @@ CFG_300_3S = PlantSpec(
     cone_model   = "5010",        # PFD: PROCone-5010, CSS 34mm
     vsi_model    = "4060_2x250",  # Closest rate-card key; PFD says 2×300HP — flagged in engine
     ref_no       = "PR/STD-26/300-3S",
+    # Geometry — confirmed from layout drawing
+    site_length_m  = 120.0,
+    site_width_m   = 55.0,
+    # Platform elevations (m above FFL) — from layout drawing
+    elevation_vgf       = 0.0,
+    elevation_surge1    = 0.0,
+    elevation_cone      = 6.0,
+    elevation_prescreen = 5.5,
+    elevation_surge2    = 3.5,
+    elevation_vsi       = 8.0,
+    elevation_screen    = 5.0,
+    # Horizontal spacings between centroids (m) — from layout drawing
+    spacing_hopper_to_jaw   = 10.0,
+    spacing_jaw_to_cone     = 26.0,
+    spacing_cone_to_screen  = 22.0,
+    spacing_cone_to_vsi     = 20.0,
+    spacing_vsi_to_screen   = 18.0,
+    spacing_screen_to_stock = 28.0,
 )
 
 # 6. 600 TPH  3-Stage  Gabro
 #    Twin secondary PROCone-5010 (50-50 feed split). 16 belt conveyors.
 #    Jaw 50x40 has a suspicious price in rate card — will surface as warning.
 #    VSI-5080 2×400HP has no price in rate card — will surface as "engineering quote required".
+#    Site: 145 × 85m (confirmed from layout drawing)
 CFG_600_3S = PlantSpec(
     client_name  = "Enquiry Client",
     tph          = 600,
@@ -122,6 +179,24 @@ CFG_600_3S = PlantSpec(
     cone_model   = "5010",        # PFD: 2× PROCone-5010 (twin flag handled in engine)
     vsi_model    = "5080_2x400",  # PFD: REMco VSI-5080 2×400HP (price = engineering quote)
     ref_no       = "PR/STD-26/600-3S",
+    # Geometry — confirmed from layout drawing
+    site_length_m  = 145.0,
+    site_width_m   = 85.0,
+    # Platform elevations (m above FFL)
+    elevation_vgf       = 0.0,
+    elevation_surge1    = 0.0,
+    elevation_cone      = 7.0,
+    elevation_prescreen = 6.5,
+    elevation_surge2    = 4.0,
+    elevation_vsi       = 9.0,
+    elevation_screen    = 5.5,
+    # Horizontal spacings (m)
+    spacing_hopper_to_jaw   = 12.0,
+    spacing_jaw_to_cone     = 32.0,
+    spacing_cone_to_screen  = 26.0,
+    spacing_cone_to_vsi     = 24.0,
+    spacing_vsi_to_screen   = 22.0,
+    spacing_screen_to_stock = 34.0,
 )
 # Attach twin-cone flag as extra attr (read by patched engine)
 CFG_600_3S._twin_cone = True
@@ -130,6 +205,7 @@ CFG_600_3S._twin_cone = True
 #    No ROM hopper, VGF, jaw or cone — just Surge Bin + 2×MVF + VSI-5080 + Screen.
 #    VSI-5080 2×400HP has no rate-card price → "engineering quote required".
 #    Handled by build_tertiary_quotation() in engine.py.
+#    Site: estimated 60 × 30m (compact footprint, no primary/secondary)
 CFG_VSI5080 = PlantSpec(
     client_name  = "Enquiry Client",
     tph          = 600,
@@ -143,6 +219,12 @@ CFG_VSI5080 = PlantSpec(
     cone_model   = None,
     vsi_model    = "5080_2x400",  # REMco VSI-5080 2×400HP
     ref_no       = "PR/STD-26/VSI5080-TERT",
+    # Geometry — compact standalone footprint
+    site_length_m  = 60.0,
+    site_width_m   = 30.0,
+    elevation_surge2 = 3.5,
+    elevation_vsi    = 7.5,
+    elevation_screen = 5.0,
 )
 CFG_VSI5080._tertiary_only = True
 

@@ -48,6 +48,55 @@ class PlantSpec:
     ref_no:         str    = "PR/XX-26/N-XXX"
     date:           str    = ""
 
+    # ── Site geometry ─────────────────────────────────────────────────────────
+    # Overall plant footprint.  If left None the engine uses TPH-scaled defaults.
+    # Source: layout drawings from PFD & LAYOUT folder.
+    site_length_m:      Optional[float] = None   # plant area length (along flow direction)
+    site_width_m:       Optional[float] = None   # plant area width (perpendicular)
+
+    # Platform / equipment elevations above finished floor level (m).
+    # Each elevation is the top-of-structure (operating floor) height.
+    # Conveyors and structural steel are derived from these values.
+    # Defaults are typical PROMAN stationary plant values; override per project.
+    elevation_vgf:          float = 0.0    # VGF + jaw — ground level (ROM area)
+    elevation_surge1:       float = 0.0    # surge bin 1 / jaw discharge area
+    elevation_cone:         float = 5.5    # secondary cone platform
+    elevation_prescreen:    float = 5.0    # intermediate screen (3-stage; above jaw discharge)
+    elevation_surge2:       float = 3.0    # surge bin 2 / VSI feed bin (3-stage)
+    elevation_vsi:          float = 7.5    # VSI platform (3-stage; above cone)
+    elevation_screen:       float = 4.5    # final screen platform
+    elevation_stockpile:    float = 0.0    # product stockpile area (ground)
+
+    # Horizontal distances between major equipment centroids along the flow axis (m).
+    # Used to determine horizontal belt run lengths.
+    # None → engine auto-distributes across site_length_m.
+    spacing_hopper_to_jaw:  Optional[float] = None
+    spacing_jaw_to_cone:    Optional[float] = None
+    spacing_cone_to_screen: Optional[float] = None
+    spacing_cone_to_vsi:    Optional[float] = None    # 3-stage only
+    spacing_vsi_to_screen:  Optional[float] = None    # 3-stage only
+    spacing_screen_to_stock: Optional[float] = None
+
+    def _site_len(self) -> float:
+        """Effective site length — explicit or TPH-scaled default."""
+        if self.site_length_m:
+            return self.site_length_m
+        # Empirical: from 4 confirmed PROMAN layout drawings
+        # 150 TPH ≈ 90m | 250 TPH ≈ 105m | 300 TPH ≈ 120m | 600 TPH ≈ 145m
+        return 75 + self.tph * 0.115
+
+    def _site_wid(self) -> float:
+        """Effective site width."""
+        if self.site_width_m:
+            return self.site_width_m
+        # Width scales more slowly — crushers are in-line
+        return 30 + self.tph * 0.065
+
+    def _spacing(self, key: str, default: float) -> float:
+        """Return explicit horizontal spacing or the given default."""
+        val = getattr(self, key, None)
+        return val if val is not None else default
+
 
 @dataclass
 class LineItem:
@@ -204,58 +253,184 @@ def _conveyor_hp(width_mm: int, length_m: float) -> float:
 
 
 # ---------------------------------------------------------------------------
-# STRUCTURAL STEEL ESTIMATION
+# STRUCTURAL STEEL ESTIMATION — geometry-aware
 # ---------------------------------------------------------------------------
+# Platform component footprints (length × width, m²) for area-based grating calc
+_PLATFORM_FOOTPRINTS = {
+    "hopper_30t": (5.0, 4.0),       # ROM hopper + VGF + jaw platform
+    "hopper_50t": (6.0, 5.0),
+    "cone_3506_3508_3510": (4.0, 3.5),
+    "cone_4510": (4.5, 4.0),
+    "cone_5010": (5.0, 4.5),
+    "prescreen": (4.5, 3.0),        # intermediate screen (3-stage)
+    "vsi_200_300": (3.0, 3.0),
+    "vsi_4060": (3.5, 3.5),
+    "vsi_5080": (4.0, 4.0),
+    "screen_2000": (7.0, 4.0),      # final 2m-wide screen
+    "screen_2400": (9.5, 4.5),      # 2.4m × 8.1m screen
+    "surge_bin": (3.0, 3.0),
+}
+
+# Column weight per metre height per column (kg): 203UC section
+_COLUMN_KG_PER_M = 86   # 203×203 UC, typical PROMAN structure
+# Grating/chequered plate: 40 kg/m²
+_GRATING_KG_M2   = 40
+# Bracing: 15% of column+platform weight (X-brace, tie beams)
+_BRACING_FACTOR  = 0.15
+# Staircase: 180 kg per metre height per flight
+_STAIR_KG_PER_M  = 180
+# Walkway rail: 25 kg/m perimeter
+_RAIL_KG_PER_M   = 25
+# Sheet-metal chutes / guards: 22 kg/m² estimated surface
+_CHUTE_KG_M2     = 22
+
+
+def _platform_struct_tons(footprint_m2: float, height_m: float, n_columns: int = 4) -> tuple:
+    """
+    Estimate structural (tons) and sheet (tons) for one elevated platform.
+
+    footprint_m2: grating platform area
+    height_m:     operating floor height above grade
+    n_columns:    number of supporting columns (4 for most equipment, 6 for long screens)
+
+    Returns (struct_tons, sheet_tons)
+    """
+    # Columns
+    col_kg = n_columns * height_m * _COLUMN_KG_PER_M
+    # Beams at top (both axes) — approximate as 30% of column weight
+    beam_kg = col_kg * 0.30
+    # Bracing
+    brace_kg = (col_kg + beam_kg) * _BRACING_FACTOR
+    # Mid-height tie beams for h > 4 m
+    if height_m > 4.0:
+        brace_kg += col_kg * 0.12
+    # Platform grating
+    grating_kg = footprint_m2 * _GRATING_KG_M2
+    # Staircase (1 flight per platform, going up from grade)
+    stair_kg = height_m * _STAIR_KG_PER_M
+    # Handrail perimeter (3 sides — one side open to equipment)
+    perim = 2 * math.sqrt(footprint_m2) * 0.75   # rough perimeter proxy
+    rail_kg = perim * _RAIL_KG_PER_M
+
+    struct_tons = (col_kg + beam_kg + brace_kg + stair_kg + rail_kg) / 1000
+    sheet_tons  = (grating_kg) / 1000
+    return struct_tons, sheet_tons
+
 
 def _calc_structural(spec: PlantSpec) -> tuple:
-    """Returns (list_price, best_price) for Sub C."""
-    struct_tons = 0
-    sheet_tons = 0
-    T = rc.STRUCTURAL_TONNAGE
+    """
+    Geometry-aware structural steel estimation.
 
-    # Hopper size depends on TPH
-    hopper_key = "rom_hopper_50t_with_vgf_jaw_platform" if spec.tph > 350 \
-                 else "rom_hopper_30t_with_vgf_jaw_platform"
-    s, sm = T[hopper_key]
-    struct_tons += s; sheet_tons += sm
+    Uses platform elevations and equipment footprints from PlantSpec to compute
+    structural tonnage bottom-up:
+      — Column weight  = height × section weight × number of columns
+      — Beam weight    = 30% of column weight (both-axis top frames)
+      — Bracing        = 15% of column+beam (X-brace + tie beams)
+      — Grating        = platform area × 40 kg/m²
+      — Staircases     = 180 kg/m height
+      — Chutes/guards  = estimated from screen + VSI count
 
-    # Cone feed tunnel or surge hopper
-    s, sm = T["tunnel_for_cone_feed"]
-    struct_tons += s; sheet_tons += sm
+    Returns (list_price, best_price) in Rs. Lakhs (structural is lump sum, no split).
+    """
+    s_total = 0.0   # structural steel tons
+    p_total = 0.0   # sheet metal (grating + chutes) tons
 
-    s, sm = T["surge_hopper_30t_for_cone"]
-    struct_tons += s; sheet_tons += sm
+    tph = spec.tph
 
-    # Cone frame
-    s, sm = T["cone_frame_walkway_stairs"]
-    struct_tons += s; sheet_tons += sm
+    # ── ROM Hopper + VGF + Jaw platform ──────────────────────────────────────
+    # This is at grade (elevation_vgf) but has a raised steel hopper shell
+    hopper_fp = _PLATFORM_FOOTPRINTS["hopper_50t" if tph > 350 else "hopper_30t"]
+    hopper_area = hopper_fp[0] * hopper_fp[1]
+    # Hopper walls: sheet metal (4 sides × avg height 3m × avg width 4m)
+    hopper_shell_t = (4 * 3.0 * 4.0 * _CHUTE_KG_M2) / 1000
+    p_total += hopper_shell_t
+    # Platform at jaw discharge height
+    jdh = max(2.0, spec.elevation_surge1 or spec.jaw_discharge_h)
+    s, p = _platform_struct_tons(hopper_area, jdh, n_columns=6)
+    s_total += s; p_total += p
 
-    if spec.stages == 3:
-        # Pre-screen support (small, reuse screen_frame at half)
-        s, sm = T["screen_frame_zframe_walkway_stairs"]
-        struct_tons += s * 0.6; sheet_tons += sm * 0.6
+    # ── Surge Bin 1 (between jaw and cone) ───────────────────────────────────
+    sb_area = _PLATFORM_FOOTPRINTS["surge_bin"][0] * _PLATFORM_FOOTPRINTS["surge_bin"][1]
+    s, p = _platform_struct_tons(sb_area, spec.elevation_cone, n_columns=4)
+    s_total += s; p_total += p
 
-        s, sm = T["surge_hopper_30t_for_vsi"]
-        struct_tons += s; sheet_tons += sm
-
-    # Main screen frame
-    s, sm = T["screen_frame_zframe_walkway_stairs"]
-    struct_tons += s; sheet_tons += sm
-
-    if spec.stages == 3:
-        s, sm = T["vsi_chutes_guards_misc"]
-        struct_tons += s; sheet_tons += sm
+    # ── Cone platform ─────────────────────────────────────────────────────────
+    if spec.cone_model in ("5010",):
+        cone_fp_key = "cone_5010"
+    elif spec.cone_model in ("4510",):
+        cone_fp_key = "cone_4510"
     else:
-        s, sm = T["transfer_tower_product_chutes"]
-        struct_tons += s * 0.5; sheet_tons += sm * 0.5
+        cone_fp_key = "cone_3506_3508_3510"
+    cone_fp  = _PLATFORM_FOOTPRINTS[cone_fp_key]
+    cone_area = cone_fp[0] * cone_fp[1]
+    twin = getattr(spec, "_twin_cone", False)
+    cone_cols = 8 if twin else 4    # twin cones need double column grid
+    cone_area_eff = cone_area * (2 if twin else 1)
+    s, p = _platform_struct_tons(cone_area_eff, spec.elevation_cone, n_columns=cone_cols)
+    s_total += s; p_total += p
 
+    # ── 3-stage additions: pre-screen + surge bin 2 + VSI ────────────────────
+    if spec.stages == 3:
+        # Intermediate screen
+        ps_area = _PLATFORM_FOOTPRINTS["prescreen"][0] * _PLATFORM_FOOTPRINTS["prescreen"][1]
+        s, p = _platform_struct_tons(ps_area, spec.elevation_prescreen, n_columns=4)
+        s_total += s; p_total += p
+
+        # Surge bin 2 (VSI feed)
+        s, p = _platform_struct_tons(sb_area, spec.elevation_surge2, n_columns=4)
+        s_total += s; p_total += p
+
+        # VSI platform
+        vsi_key = spec.vsi_model or ""
+        if "5080" in vsi_key:
+            vsi_fp_key = "vsi_5080"
+        elif "4060" in vsi_key:
+            vsi_fp_key = "vsi_4060"
+        else:
+            vsi_fp_key = "vsi_200_300"
+        vsi_fp   = _PLATFORM_FOOTPRINTS[vsi_fp_key]
+        vsi_area = vsi_fp[0] * vsi_fp[1]
+        s, p = _platform_struct_tons(vsi_area, spec.elevation_vsi, n_columns=4)
+        s_total += s; p_total += p
+
+        # VSI chutes + guards (sheet metal)
+        p_total += (vsi_area * 1.5 * _CHUTE_KG_M2) / 1000
+
+    # ── Final screen platform ─────────────────────────────────────────────────
+    scr_key = _select_screen_primary(spec.tph, decks=4)
+    if "2400" in scr_key:
+        scr_fp_key = "screen_2400"
+        scr_cols   = 6
+    else:
+        scr_fp_key = "screen_2000"
+        scr_cols   = 4
+    scr_fp   = _PLATFORM_FOOTPRINTS[scr_fp_key]
+    scr_area = scr_fp[0] * scr_fp[1]
+    scr_qty  = 2 if twin else 1
+    s, p = _platform_struct_tons(scr_area * scr_qty, spec.elevation_screen,
+                                 n_columns=scr_cols * scr_qty)
+    s_total += s; p_total += p
+
+    # Screen chutes (multi-product discharge)
+    n_products = max(4, len(spec.products))
+    p_total += (n_products * 1.2 * scr_area * _CHUTE_KG_M2) / 1000 * 0.15
+
+    # ── Conveyor support trestles ─────────────────────────────────────────────
+    # Trestles at every 6m interval along the site length; each ~0.15T structural
+    site_len = spec._site_len()
+    n_trestles = int(site_len / 6)
+    s_total += n_trestles * 0.15
+
+    # ── Mobile plants: most structure on skids (−65%) ─────────────────────────
     if spec.mobile:
-        struct_tons *= 0.35    # most structure integrated into skids
+        s_total *= 0.35
+        p_total *= 0.35
 
-    struct_cost = (struct_tons * rc.STRUCTURAL_STEEL_RATE) / 1_00_000
-    sheet_cost  = (sheet_tons  * rc.SHEET_METAL_RATE)      / 1_00_000
+    # ── Costing ───────────────────────────────────────────────────────────────
+    struct_cost = (s_total * rc.STRUCTURAL_STEEL_RATE) / 1_00_000
+    sheet_cost  = (p_total * rc.SHEET_METAL_RATE)      / 1_00_000
     total = round(struct_cost + sheet_cost, 2)
-    return total, total   # list == best for structural (lump sum)
+    return total, total
 
 
 # ---------------------------------------------------------------------------
@@ -286,131 +461,181 @@ def _calc_electrical(spec: PlantSpec) -> tuple:
 # CONVEYOR LAYOUT BUILDER
 # ---------------------------------------------------------------------------
 
+def _belt_len(horiz_m: float, rise_m: float) -> float:
+    """True belt length from horizontal run + rise (Pythagorean, rounded up to 0.5m)."""
+    raw = math.sqrt(horiz_m**2 + rise_m**2)
+    return math.ceil(raw * 2) / 2   # round up to nearest 0.5m
+
+
 def _build_conveyors_2stage(spec: PlantSpec) -> List[ConveyorSpec]:
-    """Build standard conveyor set for a 2-stage stationary plant."""
+    """
+    Build conveyor set for a 2-stage stationary plant.
+    Belt lengths are derived from PlantSpec site geometry + platform elevations.
+    """
     tph = spec.tph
-    mw = _conveyor_width(tph, "main")    # main line width
-    pw = _conveyor_width(tph, "product") # product line width
-    jh = spec.jaw_discharge_h
+    mw  = _conveyor_width(tph, "main")
+    pw  = _conveyor_width(tph, "product")
+
+    # Resolve elevations from spec
+    el_jaw    = spec.elevation_vgf        # jaw / VGF ground area
+    el_cone   = spec.elevation_cone       # cone platform top
+    el_screen = spec.elevation_screen     # screen platform top
+
+    # Horizontal distances — use explicit spacing or distribute proportionally
+    site_len = spec._site_len()
+    # Approximate: hopper occupies ~12% of site, jaw→cone 28%, cone→screen 20%
+    d_jaw_cone   = spec._spacing("spacing_jaw_to_cone",   site_len * 0.28)
+    d_cone_scr   = spec._spacing("spacing_cone_to_screen",site_len * 0.20)
+    d_scr_stock  = spec._spacing("spacing_screen_to_stock",site_len * 0.28)
 
     conveyors = []
     bc = 1
 
-    # BC-01: Under jaw (short transfer, jaw discharge to first main belt)
-    rise = 0  # horizontal or near-flat under jaw
-    l = max(8, rc.conveyor_length_from_rise(rise, horizontal_offset_m=6))
-    conveyors.append(ConveyorSpec(
-        f"BC-{bc:02d}", mw, l, _conveyor_hp(mw, l), "jaw_discharge_to_feed_belt")); bc += 1
+    # BC-01: Under jaw — horizontal transfer from jaw discharge to main feed belt
+    l = max(8.0, spec._spacing("spacing_hopper_to_jaw", site_len * 0.12))
+    conveyors.append(ConveyorSpec(f"BC-{bc:02d}", mw, l, _conveyor_hp(mw, l),
+                                  "jaw_discharge_feed_belt")); bc += 1
 
-    # BC-02, 03, 04: Jaw output to surge hopper (3 parallel routes allow recirculation)
-    # Rise = cone platform height - jaw discharge height
-    cone_h = max(5.0, jh + 3.5)
-    l = rc.conveyor_length_from_rise(cone_h - jh, horizontal_offset_m=8)
-    for _ in range(3):
-        conveyors.append(ConveyorSpec(
-            f"BC-{bc:02d}", mw, l, _conveyor_hp(mw, l), "jaw_to_cone_surge")); bc += 1
+    # BC-02, 03: Jaw to cone surge (rise: cone platform - jaw discharge)
+    rise_to_cone = max(0, el_cone - el_jaw)
+    l_j2c = max(18.0, _belt_len(d_jaw_cone * 0.5, rise_to_cone))
+    for _ in range(2):
+        conveyors.append(ConveyorSpec(f"BC-{bc:02d}", mw, l_j2c,
+                                      _conveyor_hp(mw, l_j2c), "jaw_to_cone_surge")); bc += 1
 
-    # BC-05: Cone discharge to final screen
-    screen_h = cone_h + 1.5  # screen sits above cone discharge
-    l = rc.conveyor_length_from_rise(screen_h - cone_h, horizontal_offset_m=5)
-    l = max(l, 18)
-    conveyors.append(ConveyorSpec(
-        f"BC-{bc:02d}", mw, l, _conveyor_hp(mw, l), "cone_to_screen")); bc += 1
+    # BC-03b: VGF fines bypass to final screen (horizontal, along site width)
+    site_wid = spec._site_wid()
+    l_fines  = max(12.0, site_wid * 0.45)
+    conveyors.append(ConveyorSpec(f"BC-{bc:02d}", pw, l_fines,
+                                  _conveyor_hp(pw, l_fines), "vgf_fines_to_screen")); bc += 1
 
-    # Product conveyors: typically 4 products, one for quarry fines (VGF undersize)
+    # BC-04: Cone to final screen
+    rise_to_scr = max(0, el_screen - el_cone + 1.5)   # +1.5m: discharge above screen feed
+    l_c2s = max(15.0, _belt_len(d_cone_scr, rise_to_scr))
+    conveyors.append(ConveyorSpec(f"BC-{bc:02d}", mw, l_c2s,
+                                  _conveyor_hp(mw, l_c2s), "cone_to_screen")); bc += 1
+
+    # BC-05: Oversize return (screen oversize back to cone surge — inclined)
+    l_ovr = max(10.0, _belt_len(d_cone_scr * 0.6, el_screen))
+    conveyors.append(ConveyorSpec(f"BC-{bc:02d}", mw, l_ovr,
+                                  _conveyor_hp(mw, l_ovr), "oversize_return")); bc += 1
+
+    # Product stackers: one per product fraction
     n_products = max(4, len(spec.products))
+    l_prod = max(15.0, d_scr_stock / n_products * 1.1)
     for i in range(n_products):
-        l = 15 if tph <= 250 else 18
-        conveyors.append(ConveyorSpec(
-            f"BC-{bc:02d}", pw, l, _conveyor_hp(pw, l), f"product_{i+1}")); bc += 1
-
-    # VGF quarry fines conveyor
-    conveyors.append(ConveyorSpec(
-        f"BC-{bc:02d}", mw, 15, _conveyor_hp(mw, 15), "vgf_fines")); bc += 1
-
-    # Recirculation / oversize return (short)
-    conveyors.append(ConveyorSpec(
-        f"BC-{bc:02d}", pw, 10, _conveyor_hp(pw, 10), "oversize_return")); bc += 1
+        conveyors.append(ConveyorSpec(f"BC-{bc:02d}", pw, l_prod,
+                                      _conveyor_hp(pw, l_prod), f"product_{i+1}")); bc += 1
 
     return conveyors
 
 
 def _build_conveyors_3stage(spec: PlantSpec) -> List[ConveyorSpec]:
-    """Build standard conveyor set for a 3-stage plant (jaw + cone + VSI)."""
+    """
+    Build conveyor set for a 3-stage plant (jaw + cone + VSI).
+    Belt lengths computed from PlantSpec site geometry + platform elevations.
+    """
     tph = spec.tph
-    mw = _conveyor_width(tph, "main")
-    pw = _conveyor_width(tph, "product")
-    jh = spec.jaw_discharge_h
+    mw  = _conveyor_width(tph, "main")
+    pw  = _conveyor_width(tph, "product")
+
+    # Platform elevations
+    el_jaw       = spec.elevation_vgf
+    el_prescrn   = spec.elevation_prescreen
+    el_cone      = spec.elevation_cone
+    el_surge2    = spec.elevation_surge2
+    el_vsi       = spec.elevation_vsi
+    el_screen    = spec.elevation_screen
+
+    # Horizontal distances along the flow axis
+    site_len = spec._site_len()
+    site_wid = spec._site_wid()
+    d_h2j    = spec._spacing("spacing_hopper_to_jaw",   site_len * 0.08)
+    d_j2ps   = spec._spacing("spacing_jaw_to_cone",     site_len * 0.20)  # jaw → pre-screen
+    d_ps2cn  = site_len * 0.08                                              # pre-screen → cone (short)
+    d_cn2vsi = spec._spacing("spacing_cone_to_vsi",     site_len * 0.18)
+    d_vsi2sc = spec._spacing("spacing_vsi_to_screen",   site_len * 0.12)
+    d_sc2stk = spec._spacing("spacing_screen_to_stock", site_len * 0.22)
 
     conveyors = []
     bc = 1
 
-    # BC-01: Feed belt under VGF (horizontal, short)
-    l = max(10, rc.conveyor_length_from_rise(0, horizontal_offset_m=8))
-    conveyors.append(ConveyorSpec(
-        f"BC-{bc:02d}", mw, l, _conveyor_hp(mw, l), "vgf_to_jaw_feed")); bc += 1
+    # BC-01: VGF feed belt (hopper → jaw, near-horizontal)
+    l = max(10.0, _belt_len(d_h2j, max(0, el_jaw)))
+    conveyors.append(ConveyorSpec(f"BC-{bc:02d}", mw, l, _conveyor_hp(mw, l),
+                                  "vgf_to_jaw_feed")); bc += 1
 
-    # BC-02, 03: Jaw to pre-screen
-    cone_h = max(6.0, jh + 4.0)
-    l = rc.conveyor_length_from_rise(cone_h - jh, horizontal_offset_m=8)
-    l = max(l, 25)
-    for _ in range(2):
-        conveyors.append(ConveyorSpec(
-            f"BC-{bc:02d}", mw, l, _conveyor_hp(mw, l), "jaw_to_prescreen")); bc += 1
+    # BC-02: Jaw to pre-screen (inclined: jaw discharge up to pre-screen platform)
+    l = max(25.0, _belt_len(d_j2ps, max(0, el_prescrn - el_jaw)))
+    conveyors.append(ConveyorSpec(f"BC-{bc:02d}", mw, l, _conveyor_hp(mw, l),
+                                  "jaw_to_prescreen")); bc += 1
 
-    # BC-04: Pre-screen to cone surge hopper
-    l = rc.conveyor_length_from_rise(1.5, horizontal_offset_m=5)
-    l = max(l, 18)
-    conveyors.append(ConveyorSpec(
-        f"BC-{bc:02d}", mw, l, _conveyor_hp(mw, l), "prescreen_to_cone_surge")); bc += 1
+    # BC-03: Pre-screen to cone surge (oversize fraction)
+    l = max(18.0, _belt_len(d_ps2cn, max(0, el_cone - el_prescrn)))
+    conveyors.append(ConveyorSpec(f"BC-{bc:02d}", mw, l, _conveyor_hp(mw, l),
+                                  "prescreen_oversize_to_cone")); bc += 1
 
-    # BC-05: Cone discharge to VSI feed
-    vsi_h = cone_h + 2.5
-    l = rc.conveyor_length_from_rise(vsi_h - cone_h, horizontal_offset_m=8)
-    l = max(l, 20)
-    conveyors.append(ConveyorSpec(
-        f"BC-{bc:02d}", mw, l, _conveyor_hp(mw, l), "cone_to_vsi")); bc += 1
+    # BC-04: Pre-screen bypass fines (undersize → final screen, nearly horizontal)
+    l = max(18.0, _belt_len(site_wid * 0.35, max(0, el_screen - el_prescrn + 1.5)))
+    conveyors.append(ConveyorSpec(f"BC-{bc:02d}", pw, l, _conveyor_hp(pw, l),
+                                  "prescreen_fines_to_screen")); bc += 1
 
-    # BC-06: Pre-screen undersize bypass (fine fraction bypasses cone, goes direct to final screen)
-    conveyors.append(ConveyorSpec(
-        f"BC-{bc:02d}", pw, 10, _conveyor_hp(pw, 10), "prescreen_bypass_fines")); bc += 1
+    # BC-05: Cone to MVF / surge bin 2 (VSI feed preparation)
+    l = max(20.0, _belt_len(d_cn2vsi * 0.5, max(0, el_surge2 - el_cone + 2.0)))
+    conveyors.append(ConveyorSpec(f"BC-{bc:02d}", mw, l, _conveyor_hp(mw, l),
+                                  "cone_to_vsi_surge")); bc += 1
 
-    # BC-07, 08: VSI discharge to final screen
-    screen_h = vsi_h + 1.0
-    l = rc.conveyor_length_from_rise(screen_h - vsi_h, horizontal_offset_m=6)
-    l = max(l, 18)
-    for _ in range(2):
-        conveyors.append(ConveyorSpec(
-            f"BC-{bc:02d}", mw, l, _conveyor_hp(mw, l), "vsi_to_final_screen")); bc += 1
+    # BC-06: MVF surge bin to VSI (short — surge bin sits adjacent to VSI platform)
+    l = max(10.0, _belt_len(site_wid * 0.15, max(0, el_vsi - el_surge2)))
+    conveyors.append(ConveyorSpec(f"BC-{bc:02d}", mw, l, _conveyor_hp(mw, l),
+                                  "mvf_to_vsi")); bc += 1
 
-    # BC-09: Oversize recirculation (final screen → VSI or cone)
-    l = rc.conveyor_length_from_rise(vsi_h, horizontal_offset_m=10)
-    l = max(l, 30)
-    conveyors.append(ConveyorSpec(
-        f"BC-{bc:02d}", mw, l, _conveyor_hp(mw, l), "oversize_recirculation")); bc += 1
+    # BC-07: VSI discharge to final screen
+    l = max(18.0, _belt_len(d_vsi2sc, max(0, el_screen - el_vsi + 1.5)))
+    conveyors.append(ConveyorSpec(f"BC-{bc:02d}", mw, l, _conveyor_hp(mw, l),
+                                  "vsi_to_screen")); bc += 1
 
-    # Pre-screen fines distribution belt
-    conveyors.append(ConveyorSpec(
-        f"BC-{bc:02d}", pw, 15, _conveyor_hp(pw, 15), "prescreen_fines_dist")); bc += 1
+    # BC-08: Oversize recirculation (screen → back to VSI or cone)
+    l = max(28.0, _belt_len(d_vsi2sc + d_cn2vsi * 0.5, el_vsi))
+    conveyors.append(ConveyorSpec(f"BC-{bc:02d}", mw, l, _conveyor_hp(mw, l),
+                                  "oversize_recirculation")); bc += 1
 
-    # Product conveyors
+    # BC-09: VGF fines (grizzly pass-through to product area, horizontal)
+    l = max(18.0, d_sc2stk * 0.6)
+    conveyors.append(ConveyorSpec(f"BC-{bc:02d}", mw, l, _conveyor_hp(mw, l),
+                                  "vgf_fines")); bc += 1
+
+    # Product stackers (one per product fraction)
     n_products = max(5, len(spec.products))
+    l_prod = max(15.0, d_sc2stk / n_products * 1.1)
     for i in range(n_products):
-        l = 10 if tph <= 250 else 15
-        conveyors.append(ConveyorSpec(
-            f"BC-{bc:02d}", pw, l, _conveyor_hp(pw, l), f"product_{i+1}")); bc += 1
+        conveyors.append(ConveyorSpec(f"BC-{bc:02d}", pw, l_prod,
+                                      _conveyor_hp(pw, l_prod), f"product_{i+1}")); bc += 1
 
-    # VGF quarry fines
-    conveyors.append(ConveyorSpec(
-        f"BC-{bc:02d}", mw, 10, _conveyor_hp(mw, 10), "vgf_fines")); bc += 1
+    # BC-n+1: Pre-screen fines distribution (short cross-belt)
+    conveyors.append(ConveyorSpec(f"BC-{bc:02d}", pw, 12.0,
+                                  _conveyor_hp(pw, 12.0), "prescreen_fines_dist")); bc += 1
 
-    # WSG feed conveyor (if washing)
+    # BC-n+2: Second jaw-to-prescreen (parallel line for high-TPH plants)
+    if tph >= 300:
+        conveyors.append(ConveyorSpec(f"BC-{bc:02d}", mw,
+                                      max(25.0, _belt_len(d_j2ps, el_prescrn - el_jaw)),
+                                      _conveyor_hp(mw, max(25.0, _belt_len(d_j2ps, el_prescrn - el_jaw))),
+                                      "jaw_to_prescreen_2")); bc += 1
+
+    # BC-n+3: Second cone-to-VSI (parallel — for twin cones 600 TPH)
+    if getattr(spec, "_twin_cone", False):
+        conveyors.append(ConveyorSpec(f"BC-{bc:02d}", mw, l,
+                                      _conveyor_hp(mw, l),
+                                      "cone_B_to_vsi_surge")); bc += 1
+
+    # WSG feed conveyors (if washing)
     if spec.wsg_size:
-        l = 24
-        conveyors.append(ConveyorSpec(
-            f"BC-{bc:02d}", pw, l, _conveyor_hp(pw, l), "wsg_feed")); bc += 1
-        conveyors.append(ConveyorSpec(
-            f"BC-{bc:02d}", pw, 15, _conveyor_hp(pw, 15), "wsg_product")); bc += 1
+        l_wsg = 24.0
+        conveyors.append(ConveyorSpec(f"BC-{bc:02d}", pw, l_wsg,
+                                      _conveyor_hp(pw, l_wsg), "wsg_feed")); bc += 1
+        conveyors.append(ConveyorSpec(f"BC-{bc:02d}", pw, 15.0,
+                                      _conveyor_hp(pw, 15.0), "wsg_product")); bc += 1
 
     return conveyors
 
