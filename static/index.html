@@ -194,7 +194,7 @@
             <label for="f-mobile">Portable / Skid-mounted plant</label>
           </div>
           <details style="margin-top:4px">
-            <summary style="font-size:11px;color:var(--muted);cursor:pointer">Advanced overrides</summary>
+            <summary style="font-size:11px;color:var(--muted);cursor:pointer">▸ Equipment overrides</summary>
             <div style="margin-top:8px">
               <div class="form-grid">
                 <div class="form-row"><label>VGF model</label><input id="f-vgf" placeholder="auto"/></div>
@@ -209,6 +209,42 @@
                   <select id="f-wsg"><option value="">None</option><option>40</option><option>70</option><option>120</option></select>
                 </div>
                 <div class="form-row"><label>Jaw Discharge H (m)</label><input id="f-jh" type="number" value="1.83" step="0.1"/></div>
+              </div>
+            </div>
+          </details>
+
+          <details style="margin-top:6px">
+            <summary style="font-size:11px;color:var(--muted);cursor:pointer">▸ Site geometry &amp; elevations</summary>
+            <div style="margin-top:8px;padding:8px;background:#f5f8fc;border-radius:4px;border:1px solid var(--border)">
+              <p style="font-size:10px;color:var(--muted);margin-bottom:8px">
+                Leave blank to use engine defaults. Values drive conveyor lengths, structural steel weights and 3D layout.
+              </p>
+              <div style="font-size:10px;font-weight:600;color:var(--navy);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">Plant Footprint</div>
+              <div class="form-grid">
+                <div class="form-row"><label>Site Length (m)</label><input id="f-site-len" type="number" placeholder="auto" step="1" min="50" max="300"/></div>
+                <div class="form-row"><label>Site Width (m)</label><input id="f-site-wid" type="number" placeholder="auto" step="1" min="20" max="150"/></div>
+              </div>
+              <div style="font-size:10px;font-weight:600;color:var(--navy);margin:8px 0 4px;text-transform:uppercase;letter-spacing:.5px">Platform Elevations above FFL (m)</div>
+              <div class="form-grid">
+                <div class="form-row"><label>Cone platform</label><input id="f-el-cone" type="number" placeholder="5.5" step="0.5" min="0"/></div>
+                <div class="form-row"><label>Pre-screen</label><input id="f-el-prescrn" type="number" placeholder="5.0" step="0.5" min="0"/></div>
+              </div>
+              <div class="form-grid">
+                <div class="form-row"><label>VSI surge bin</label><input id="f-el-surge2" type="number" placeholder="3.0" step="0.5" min="0"/></div>
+                <div class="form-row"><label>VSI platform</label><input id="f-el-vsi" type="number" placeholder="7.5" step="0.5" min="0"/></div>
+              </div>
+              <div class="form-grid">
+                <div class="form-row"><label>Final screen</label><input id="f-el-screen" type="number" placeholder="4.5" step="0.5" min="0"/></div>
+                <div class="form-row"></div>
+              </div>
+              <div style="font-size:10px;font-weight:600;color:var(--navy);margin:8px 0 4px;text-transform:uppercase;letter-spacing:.5px">Centroid Spacings (m)</div>
+              <div class="form-grid">
+                <div class="form-row"><label>Jaw → Cone</label><input id="f-sp-j2c" type="number" placeholder="auto" step="1" min="5"/></div>
+                <div class="form-row"><label>Cone → VSI</label><input id="f-sp-c2v" type="number" placeholder="auto" step="1" min="5"/></div>
+              </div>
+              <div class="form-grid">
+                <div class="form-row"><label>VSI → Screen</label><input id="f-sp-v2s" type="number" placeholder="auto" step="1" min="5"/></div>
+                <div class="form-row"><label>Screen → Stockpile</label><input id="f-sp-s2k" type="number" placeholder="auto" step="1" min="5"/></div>
               </div>
             </div>
           </details>
@@ -317,9 +353,14 @@ async function runTriage() {
   document.getElementById('triage-result').innerHTML = html;
 }
 
+function _num(id) {
+  const v = parseFloat(document.getElementById(id)?.value);
+  return isNaN(v) ? null : v;
+}
+
 function buildQuoteReq() {
   const products = document.getElementById('f-products').value.trim().split('\n').map(s=>s.trim()).filter(Boolean);
-  return {
+  const req = {
     client_name:   document.getElementById('f-client').value || 'Client',
     tph:           parseInt(document.getElementById('f-tph').value) || 250,
     stages:        parseInt(document.getElementById('f-stages').value),
@@ -334,7 +375,22 @@ function buildQuoteReq() {
     vsi_model:     document.getElementById('f-vsi').value || null,
     wsg_size:      document.getElementById('f-wsg').value || null,
     ref_no:        document.getElementById('f-ref').value || '',
+    // Site geometry — only included when the user typed a value
+    site_length_m:            _num('f-site-len'),
+    site_width_m:             _num('f-site-wid'),
+    elevation_cone:           _num('f-el-cone'),
+    elevation_prescreen:      _num('f-el-prescrn'),
+    elevation_surge2:         _num('f-el-surge2'),
+    elevation_vsi:            _num('f-el-vsi'),
+    elevation_screen:         _num('f-el-screen'),
+    spacing_jaw_to_cone:      _num('f-sp-j2c'),
+    spacing_cone_to_vsi:      _num('f-sp-c2v'),
+    spacing_vsi_to_screen:    _num('f-sp-v2s'),
+    spacing_screen_to_stock:  _num('f-sp-s2k'),
   };
+  // Strip nulls so API receives only supplied values
+  Object.keys(req).forEach(k => { if (req[k] === null) delete req[k]; });
+  return req;
 }
 
 async function runQuote() {

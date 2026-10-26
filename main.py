@@ -88,6 +88,20 @@ class QuoteRequest(BaseModel):
     vgf_model: Optional[str] = None
     ref_no: str = ""
     date: str = ""
+    # ── Site geometry (optional — engine uses smart defaults when absent) ──
+    site_length_m:       Optional[float] = None  # overall plant footprint length (m)
+    site_width_m:        Optional[float] = None  # overall plant footprint width  (m)
+    # Platform elevations above FFL (m)
+    elevation_cone:      Optional[float] = None
+    elevation_prescreen: Optional[float] = None
+    elevation_surge2:    Optional[float] = None
+    elevation_vsi:       Optional[float] = None
+    elevation_screen:    Optional[float] = None
+    # Key centroid spacings (m) — leave blank to let engine auto-distribute
+    spacing_jaw_to_cone:     Optional[float] = None
+    spacing_cone_to_vsi:     Optional[float] = None
+    spacing_vsi_to_screen:   Optional[float] = None
+    spacing_screen_to_stock: Optional[float] = None
 
 class StandaloneRequest(BaseModel):
     category: str   # VSI / JAW / CONE / VGF / SCREEN / WSG
@@ -194,24 +208,45 @@ def _quotation_to_dict(q: Quotation) -> dict:
 
 def _make_spec(r: QuoteRequest) -> PlantSpec:
     ref = r.ref_no or f"PR/{date.today().strftime('%m-%y')}/N-{str(uuid.uuid4())[:4].upper()}"
-    return PlantSpec(
-        client_name   = r.client_name,
-        tph           = r.tph,
-        stages        = r.stages,
-        feed_size_mm  = r.feed_size_mm,
-        material      = r.material,
-        products      = r.products,
-        mobile        = r.mobile,
-        wsg_size      = r.wsg_size,
-        wsg_config    = r.wsg_config,
+
+    # Build kwargs — only pass geometry fields that were actually supplied
+    # so PlantSpec dataclass defaults (smart fallbacks) take over for missing ones.
+    kw: dict = dict(
+        client_name     = r.client_name,
+        tph             = r.tph,
+        stages          = r.stages,
+        feed_size_mm    = r.feed_size_mm,
+        material        = r.material,
+        products        = r.products,
+        mobile          = r.mobile,
+        wsg_size        = r.wsg_size,
+        wsg_config      = r.wsg_config,
         jaw_discharge_h = r.jaw_discharge_h,
-        jaw_model     = r.jaw_model,
-        cone_model    = r.cone_model,
-        vsi_model     = r.vsi_model,
-        vgf_model     = r.vgf_model,
-        ref_no        = ref,
-        date          = r.date or date.today().strftime("%d-%m-%Y"),
+        jaw_model       = r.jaw_model,
+        cone_model      = r.cone_model,
+        vsi_model       = r.vsi_model,
+        vgf_model       = r.vgf_model,
+        ref_no          = ref,
+        date            = r.date or date.today().strftime("%d-%m-%Y"),
     )
+
+    # Optional geometry overrides — skip if None (let engine use defaults)
+    _geo = {
+        "site_length_m":       r.site_length_m,
+        "site_width_m":        r.site_width_m,
+        "elevation_cone":      r.elevation_cone,
+        "elevation_prescreen": r.elevation_prescreen,
+        "elevation_surge2":    r.elevation_surge2,
+        "elevation_vsi":       r.elevation_vsi,
+        "elevation_screen":    r.elevation_screen,
+        "spacing_jaw_to_cone":     r.spacing_jaw_to_cone,
+        "spacing_cone_to_vsi":     r.spacing_cone_to_vsi,
+        "spacing_vsi_to_screen":   r.spacing_vsi_to_screen,
+        "spacing_screen_to_stock": r.spacing_screen_to_stock,
+    }
+    kw.update({k: v for k, v in _geo.items() if v is not None})
+
+    return PlantSpec(**kw)
 
 
 # ---------------------------------------------------------------------------
