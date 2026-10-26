@@ -32,8 +32,9 @@ from bundle import (BundleSpec, BundleEquipmentItem, BundleConveyorItem,
 from erpnext_bridge import (parse_lead_payload, push_quote_to_lead,
                              fetch_lead, list_new_leads)
 import masters_manager as mm
-from equipment_selector import build_equipment_schedule
+from equipment_selector import build_equipment_schedule, build_tertiary_schedule
 from procurement_bom import build_procurement_bom
+from pfd_generator import generate_pfd_html
 
 # ---------------------------------------------------------------------------
 app = FastAPI(title="PROMAN Quotation Engine", version="1.0.0")
@@ -581,6 +582,28 @@ async def get_3d_layout_data(
             "schedule": schedule, "positions": positions, "bom": bom,
             "procurement_bom": proc_bom,
             "plant_length_m": schedule.get("_plant_length_m", 0)}
+
+
+@app.get("/pfd/{tph}/{stages}", response_class=HTMLResponse)
+async def get_pfd(
+    tph: int,
+    stages: int,
+    material: str = "Granite",
+    _: dict = Depends(require_login),
+):
+    """
+    Serve an interactive SVG Process Flow Diagram for the given plant configuration.
+
+    stages=0  → Tertiary standalone VSI plant (no jaw/cone)
+    stages=2  → 2-stage plant (jaw + cone + screen)
+    stages=3  → 3-stage plant (jaw + cone + VSI + screens)
+    """
+    if stages == 0:
+        schedule = build_tertiary_schedule(tph, material)
+    else:
+        schedule = build_equipment_schedule(tph, stages, material)
+    html_content = generate_pfd_html(schedule, tph, stages, material)
+    return HTMLResponse(content=html_content)
 
 
 @app.get("/api/layout/bom-excel")

@@ -45,11 +45,11 @@ def select_vgf(tph: float) -> dict:
             "feed_capacity_mtph": 150,
             "max_feed_mm": 500,
         }
-    elif tph <= 280:
+    elif tph <= 360:
         return {
             "model": "VGF 1.2m x 5.0m",
             "footprint_key": "1200x5000",
-            "feed_capacity_mtph": 250,
+            "feed_capacity_mtph": 280,
             "max_feed_mm": 650,
         }
     else:
@@ -180,12 +180,12 @@ def select_vsi(tph_into_vsi: float) -> dict:
             "tph_capacity": 262,
         }
     elif tph_into_vsi <= 380:
-        # Layout (300 TPH plant) confirms 2×250HP for VSI-4060
+        # PFD (300 TPH plant) confirms 2×300HP for VSI-4060
         return {
             "model": "PROMAN REMco VSI-4060",
             "footprint_key": "REMco_VSI4060",
             "max_feed_mm": 45,
-            "motor_hp": "2x250 HP",
+            "motor_hp": "2x300 HP",
             "tph_capacity": 380,
         }
     else:
@@ -275,6 +275,62 @@ def recommend_screen_cuts(stages: int, product_type: str = "standard") -> dict:
 # FULL PLANT EQUIPMENT SCHEDULE
 # ---------------------------------------------------------------------------
 
+def build_tertiary_schedule(
+    tph: float,
+    material: str = "granite",
+    product_type: str = "standard",
+) -> dict:
+    """
+    Tertiary-only (standalone VSI) plant schedule.
+    Feed: -50mm crushed stone → VSI → Screen → Products.
+    No ROM hopper, VGF, jaw crusher, or cone crusher.
+    Equipment: Surge Bin + 2× MVF Feeder + VSI + Screen + 4 Belt Conveyors.
+
+    Used for: Tertiary VSI-5080 standalone (600 mt/h feed) config.
+    """
+    vsi = select_vsi(tph)
+
+    # For a tertiary plant the single screen is the final screen
+    if tph <= 175:
+        screen = {"model": "Screen 2.0m x 5.0m 4-Deck", "footprint_key": "2000x5000_4d", "decks": 4}
+    elif tph <= 380:
+        screen = {"model": "Screen 2.0m x 7.0m 4-Deck", "footprint_key": "2000x7000_4d", "decks": 4}
+    else:
+        screen = {"model": "Screen 2.4m x 8.1m 3-Deck",  "footprint_key": "2400x8100_3d", "decks": 3}
+
+    schedule = {
+        "tph_nominal": tph,
+        "stages": 1,          # logical "stage count" — used by position builder
+        "plant_type": "tertiary_standalone",
+        "material": material,
+        "material_group": material_group(material),
+        "product_type": product_type,
+        "vgf":    None,
+        "jaw":    None,
+        "cone":   None,
+        "vsi":    vsi,
+        "mvf_feeder": {
+            "model": "MVF Mechanical Vibratory Feeder",
+            "qty": 2,
+            "note": "Two feeders for regulated feed to VSI from surge bin",
+        },
+        "surge_bin": {
+            "model": "Surge Bin (tertiary feed)",
+            "capacity_t": 30 if tph <= 380 else 50,
+        },
+        "screens": {"intermediate": None, "final": screen},
+        "conveyor_count": 4,
+        "gradation": recommend_screen_cuts(3, product_type),  # 3-stage cuts (finest products)
+        "notes": [
+            "Tertiary standalone: no primary/secondary crushing — feed assumed -50mm crushed stone.",
+            f"VSI: {vsi['model']} | Motor: {vsi.get('motor_hp','—')}",
+            "4 belt conveyors: feed belt, VSI discharge, screen u/f, product stacker.",
+            "All capacities ±10% per AggFlow methodology. Moisture assumed ≤2%.",
+        ],
+    }
+    return schedule
+
+
 def build_equipment_schedule(
     tph: float,
     stages: int,
@@ -286,13 +342,17 @@ def build_equipment_schedule(
 
     Args:
         tph: Plant nominal capacity in metric tonnes per hour
-        stages: Number of crushing stages (1-4)
+        stages: Number of crushing stages (1-4); pass stages=0 for tertiary-only
         material: Feed material name (granite, basalt, limestone, etc.)
         product_type: 'standard' | 'road' | 'concrete'
 
     Returns:
         dict with keys: vgf, jaw, cone, vsi, screens, gradation, notes
     """
+    # Tertiary-only standalone path (stages=0 or plant_type hint)
+    if stages == 0:
+        return build_tertiary_schedule(tph, material, product_type)
+
     # VSI throughput ≈ nominal TPH (PFD evidence):
     # 150 TPH plant → 142 mt/h VSI-200 | 250 TPH → 242 mt/h VSI-300
     # 300 TPH → 312 mt/h VSI-4060      | 600 TPH → 650 mt/h VSI-5080
@@ -336,6 +396,7 @@ if __name__ == "__main__":
         (150, 2, "granite"), (150, 3, "granite"),
         (250, 2, "granite"), (250, 3, "basalt"),
         (300, 3, "limestone"), (600, 3, "gabro"),
+        (600, 0, "gabro"),   # tertiary standalone VSI-5080
     ]
     for tph, stg, mat in configs:
         r = build_equipment_schedule(tph, stg, mat)

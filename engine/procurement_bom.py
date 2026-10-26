@@ -30,7 +30,7 @@ MOTOR_SPECS: dict[str, dict] = {
     "2x PROCone-5010 (twin, 50-50 split)":  {"qty":2,"kw":220, "hp":295, "type":"SCIM, IP55, B3 foot-mtd",      "start":"Soft Starter"},
     "PROMAN REMco VSI-200":                  {"qty":2,"kw":75,  "hp":100, "type":"SCIM, IP55, Flange-mtd",       "start":"Star-Delta"},
     "PROMAN REMco VSI-300":                  {"qty":2,"kw":110, "hp":148, "type":"SCIM, IP55, Flange-mtd",       "start":"Star-Delta"},
-    "PROMAN REMco VSI-4060":                 {"qty":2,"kw":185, "hp":250, "type":"SCIM, IP55, Flange-mtd",       "start":"Star-Delta"},  # Layout confirms 2×250HP
+    "PROMAN REMco VSI-4060":                 {"qty":2,"kw":224, "hp":300, "type":"SCIM, IP55, Flange-mtd",       "start":"Star-Delta"},  # PFD (300 TPH plant) confirms 2×300HP
     "PROMAN REMco VSI-5080":                 {"qty":2,"kw":315, "hp":423, "type":"SCIM, IP55, Flange-mtd",       "start":"Star-Delta"},
     "Screen 1.2m x 4.0m 3-Deck":            {"qty":2,"kw":7.5, "hp":10,  "type":"Vibrator Motor TEFC",          "start":"DOL"},
     "Screen 2.0m x 5.0m 3-Deck":            {"qty":2,"kw":11,  "hp":15,  "type":"Vibrator Motor TEFC",          "start":"DOL"},
