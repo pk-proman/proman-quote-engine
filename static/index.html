@@ -408,6 +408,7 @@ async function runQuote() {
     const r = await fetch(API+'/api/quote', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(req)});
     const d = await r.json();
     if (!r.ok) throw new Error(d.detail || 'API error');
+    _bomLoaded = false;  // reset so BOM tab refreshes for new quote
     renderQuoteResult(d, req);
     setStatus(`Quote ready — ₹${d.totals.grand_total_list}L (List)`);
   } catch(e) {
@@ -510,7 +511,8 @@ function renderQuoteResult(d, req) {
   <div class="btn-row">
     <button class="btn btn-green" onclick="downloadXlsx()">⬇ Price Schedule (.xlsx)</button>
     <button class="btn btn-navy" onclick="downloadDocx()">⬇ Offer Letter (.docx)</button>
-    <button class="btn btn-outline" onclick="open3DLayout()">🏗️ 3D Plant Layout</button>
+    <button class="btn btn-outline" onclick="downloadDeepBom()">⬇ Deep BOM (.xlsx)</button>
+    <button class="btn btn-outline" onclick="open3DLayout()">🏗️ 3D Layout</button>
   </div>
 
   <!-- Tabs -->
@@ -520,6 +522,7 @@ function renderQuoteResult(d, req) {
         <div class="tab active" onclick="switchTab('tab-summary',this)">Summary</div>
         <div class="tab" onclick="switchTab('tab-equipment',this)">Equipment (A)</div>
         <div class="tab" onclick="switchTab('tab-conveyors',this)">Conveyors (B)</div>
+        <div class="tab" onclick="switchTab('tab-bom',this);loadBomTab()">Procurement BOM</div>
       </div>
 
       <!-- Summary tab -->
@@ -558,6 +561,13 @@ function renderQuoteResult(d, req) {
           <tbody>${convRows}</tbody>
         </table>
         <p style="font-size:10px;color:var(--muted);margin-top:6px">Chutes &amp; supports: ₹${d.sub_b_chutes_list}L | Total conveyors HP: ${t.sub_b_hp}</p>
+      </div>
+
+      <!-- Procurement BOM tab (lazy-loaded) -->
+      <div class="tab-pane" id="tab-bom">
+        <div id="bom-content" style="padding:12px;color:var(--muted);font-size:12px">
+          Click the tab to load BOM…
+        </div>
       </div>
     </div>
   </div>`;
@@ -605,10 +615,105 @@ async function downloadStandaloneDocx() {
 }
 
 function open3DLayout() {
-  if (!lastQuoteReq) { alert('Generate a quote first, then click 3D Plant Layout.'); return; }
+  if (!lastQuoteReq) { alert('Generate a quote first, then click 3D Layout.'); return; }
   const p = lastQuoteReq;
   const q = `tph=${p.tph}&stages=${p.stages}&material=${encodeURIComponent(p.material||'Granite')}`;
   window.open(`/layout3d?${q}`, '_blank');
+}
+
+let _bomLoaded = false;
+async function loadBomTab() {
+  if (_bomLoaded || !lastQuoteReq) return;
+  const el = document.getElementById('bom-content');
+  el.innerHTML = '<span class="spinner"></span> Loading procurement BOM…';
+  const p = lastQuoteReq;
+  try {
+    const r = await fetch(`${API}/api/layout/3d-data?tph=${p.tph}&stages=${p.stages}&material=${encodeURIComponent(p.material||'Granite')}`, {credentials:'include'});
+    const d = await r.json();
+    const bom = d.bom || [];
+    const proc = d.procurement_bom || {};
+    const mfg  = proc.manufactured || [];
+    const bo   = proc.bought_out   || [];
+    const wear = proc.wear_parts   || [];
+
+    const CAT_COLOR = {
+      HOPPER:'#fef3c7',VGF:'#fef3c7',JAW:'#fee2e2',CONE:'#dbeafe',
+      VSI:'#ede9fe',SCREEN:'#d1fae5',BIN:'#f8fafc',CONVEYOR:'#fff7ed',
+      FEEDER:'#fff7ed',MOTOR:'#e0f2fe',DRIVE:'#e0f2fe',LUBE:'#fef3c7',
+      ELECTRICAL:'#ede9fe',INSTRUMENT:'#e0f2fe',WEAR_PARTS:'#fef2f2',
+      CONSUMABLE:'#fff7ed',STRUCTURAL:'#f0fdf4'
+    };
+    function tblRow(cells, bg) {
+      return `<tr style="background:${bg||'#fff'}">${cells.map(c=>`<td style="padding:4px 7px;border-bottom:1px solid #e2e8f0;font-size:11px">${c??''}</td>`).join('')}</tr>`;
+    }
+    function tblHead(cols) {
+      return `<thead><tr>${cols.map(c=>`<th style="background:#1F3864;color:#fff;padding:5px 7px;font-size:10px;font-weight:600;text-align:left">${c}</th>`).join('')}</tr></thead>`;
+    }
+
+    // Section: Main Equipment BOM
+    let html = `<div style="font-size:11px;font-weight:700;color:#1F3864;padding:10px 0 4px;text-transform:uppercase;letter-spacing:.5px">Main Equipment Schedule</div>`;
+    html += `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">
+      ${tblHead(['Sl','Stage','Category','Description / Model','Qty','Specs'])}
+      <tbody>${bom.map(item => tblRow([item.sl,item.stage,item.category,`<strong>${item.description}</strong><br><span style="color:#6b7a90">${item.model}</span>`,item.qty,item.specs||''], CAT_COLOR[item.category]||'#fff')).join('')}</tbody>
+    </table></div>`;
+
+    // Section: Manufactured Parts
+    if (mfg.length) {
+      html += `<div style="font-size:11px;font-weight:700;color:#1F3864;padding:12px 0 4px;text-transform:uppercase;letter-spacing:.5px">Manufactured Equipment</div>`;
+      html += `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">
+        ${tblHead(['Sl','Category','Description','Model / Spec','Qty','Unit','Technical Specs'])}
+        <tbody>${mfg.map(i => tblRow([i.sl,i.category,i.description,i.model,i.qty,i.unit,i.specs], CAT_COLOR[i.category]||'#fff')).join('')}</tbody>
+      </table></div>`;
+    }
+
+    // Section: Bought-out items
+    if (bo.length) {
+      html += `<div style="font-size:11px;font-weight:700;color:#1F3864;padding:12px 0 4px;text-transform:uppercase;letter-spacing:.5px">Bought-Out Items (Motors, Drives, Electrical)</div>`;
+      html += `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">
+        ${tblHead(['Sl','Category','Description','Model / Spec','Qty','Unit','Specs'])}
+        <tbody>${bo.map(i => tblRow([i.sl,i.category,i.description,i.model,i.qty,i.unit,i.specs], CAT_COLOR[i.category]||'#fff')).join('')}</tbody>
+      </table></div>`;
+    }
+
+    // Section: Wear parts
+    if (wear.length) {
+      html += `<div style="font-size:11px;font-weight:700;color:#1F3864;padding:12px 0 4px;text-transform:uppercase;letter-spacing:.5px">Wear Parts (Initial Supply — 2 Sets)</div>`;
+      html += `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">
+        ${tblHead(['Sl','Equipment','Wear Item','Material','Qty','Unit','Wt (kg)','Life (hrs)'])}
+        <tbody>${wear.map(i => tblRow([i.sl,i.equipment,i.item,i.material,i.qty,i.unit,i.wt_kg,i.life_hrs], '#fef2f2')).join('')}</tbody>
+      </table></div>`;
+    }
+
+    const stats = proc.summary_stats || {};
+    html += `<div style="margin-top:10px;padding:8px;background:#f0f4f8;border-radius:4px;font-size:11px;color:#6b7a90">
+      <strong>Summary:</strong> Structural steel ≈ ${stats.total_structural_mt||'—'} MT &nbsp;|&nbsp;
+      Belt width ${stats.belt_width_mm||'—'}mm &nbsp;|&nbsp;
+      ${stats.conveyor_count||'—'} conveyors &nbsp;|&nbsp;
+      Est. connected load ${stats.est_connected_kw ? Math.round(stats.est_connected_kw) : '—'} kW
+      <button class="btn btn-outline btn-sm" style="margin-left:12px" onclick="downloadDeepBom()">⬇ Full BOM Excel (6 sheets)</button>
+    </div>`;
+
+    el.innerHTML = html;
+    _bomLoaded = true;
+  } catch(e) {
+    el.innerHTML = `<span style="color:red">⚠️ Failed to load BOM: ${e.message}</span>`;
+  }
+}
+
+async function downloadDeepBom() {
+  if (!lastQuoteReq) { alert('Generate a quote first.'); return; }
+  const p = lastQuoteReq;
+  setStatus('Generating deep BOM Excel…');
+  const url = `${API}/api/layout/bom-excel?tph=${p.tph}&stages=${p.stages}&material=${encodeURIComponent(p.material||'Granite')}&client=${encodeURIComponent(p.client_name||'Client')}`;
+  const r = await fetch(url, {credentials:'include'});
+  if (!r.ok) { setStatus('BOM download failed'); return; }
+  const blob = await r.blob();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `DeepBOM_${p.tph}TPH_${p.stages}Stage.xlsx`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  setStatus('Deep BOM downloaded.');
 }
 
 function resetForm() {
