@@ -484,14 +484,22 @@ def build_quotation(spec: PlantSpec) -> Quotation:
                 f"Vibratory Screen {pre_screen_key.replace('_', ' ').replace('x', 'mm x ').upper()} (Pre-screen)",
                 1, ps["hp"], ps["list"], ps["best"])); sl += 1
 
-    # Cone
+    # Cone — support twin-cone flag (e.g. 600 TPH gabro: 2× PROCone-5010 in 50-50 split)
+    twin_cone = getattr(spec, "_twin_cone", False)
+    cone_qty  = 2 if twin_cone else 1
     cone = rc.get_cone(cone_key)
     if not cone:
         q.warnings.append(f"Cone model {cone_key} not in range for {spec.tph} TPH.")
     else:
-        desc = f"PROcone-{cone_key} with Sub-Base Frame"
-        li = LineItem(str(sl), desc, 1, cone["hp"] + cone.get("aux_hp", 0),
-                      cone["list"], cone["best"])
+        twin_note = " (Twin — 50-50 feed split)" if twin_cone else " with Sub-Base Frame"
+        desc = f"PROcone-{cone_key}{twin_note}"
+        cone_lp = round((cone["list"] or 0) * cone_qty, 2) if cone["list"] else None
+        cone_bp = round((cone["best"] or 0) * cone_qty, 2) if cone["best"] else None
+        li = LineItem(str(sl), desc, cone_qty,
+                      (cone["hp"] + cone.get("aux_hp", 0)) * cone_qty,
+                      cone_lp, cone_bp)
+        if twin_cone:
+            q.warnings.append(f"Twin PROCone-{cone_key}: qty × 2, cost × 2 (50-50 split arrangement).")
         q.sub_a_items.append(li); sl += 1
 
     # VSI (3-stage only)
@@ -508,11 +516,20 @@ def build_quotation(spec: PlantSpec) -> Quotation:
             q.sub_a_items.append(li); sl += 1
 
     # Main (final product) screen
+    # 600 TPH gabro uses twin final screens (2× 2400x8100_3d per layout)
+    twin_screen = twin_cone  # same flag: if twin cones → twin final screens
+    scr_qty = 2 if twin_screen else 1
     ms = rc.get_screen(main_screen_key)
     if ms:
-        q.sub_a_items.append(LineItem(str(sl),
-            f"Vibratory Screen {main_screen_key.replace('_', ' ').upper()}",
-            1, ms["hp"], ms["list"], ms["best"])); sl += 1
+        scr_lp = round((ms["list"] or 0) * scr_qty, 2) if ms.get("list") else None
+        scr_bp = round((ms["best"] or 0) * scr_qty, 2) if ms.get("best") else None
+        scr_desc = f"Vibratory Screen {main_screen_key.replace('_', ' ').upper()}"
+        if twin_screen:
+            scr_desc = "2× " + scr_desc + " (Twin Final Screens)"
+        q.sub_a_items.append(LineItem(str(sl), scr_desc,
+            scr_qty, ms["hp"] * scr_qty, scr_lp, scr_bp)); sl += 1
+        if twin_screen:
+            q.warnings.append("Twin final screens (qty 2): cost × 2 — per 600 TPH gabro layout.")
     else:
         q.warnings.append(f"Screen {main_screen_key} not found.")
 
@@ -586,6 +603,106 @@ def build_quotation(spec: PlantSpec) -> Quotation:
         q.erection = rc.ERECTION["3stage"]
     else:
         q.erection = rc.ERECTION["2stage_stationary"]
+
+    return q
+
+
+# ---------------------------------------------------------------------------
+# TERTIARY-ONLY QUOTATION  (no jaw/cone — just VSI + screen + feeders)
+# Used for the "Tertiary Standalone VSI-5080" config (stages=1 / _tertiary_only=True)
+# ---------------------------------------------------------------------------
+
+def build_tertiary_quotation(spec: PlantSpec) -> Quotation:
+    """
+    Build a quotation for a tertiary-only (standalone VSI) plant.
+    No VGF, jaw crusher, or cone crusher.
+    Equipment: Surge Bin (structural) + 2× MVF + VSI + Vibrating Screen + 4 conveyors.
+    """
+    q = Quotation(spec=spec)
+    q.warnings.append("Tertiary-only plant: no VGF / jaw / cone in this quotation.")
+
+    vsi_key = spec.vsi_model or "5080_2x400"
+    sl = 1
+
+    # VSI
+    vsi = rc.get_vsi(vsi_key)
+    if not vsi:
+        q.warnings.append(f"VSI model {vsi_key} not found in rate card.")
+    elif vsi.get("list") is None:
+        q.warnings.append(
+            f"⚠️ REMco VSI-{vsi_key}: NO PRICE in rate card — "
+            "engineering / sales quote required before sending this proposal."
+        )
+        # Add a zero-price placeholder so the schedule is visible
+        q.sub_a_items.append(LineItem(
+            str(sl), f"REMCO VSI-{vsi_key} with IP55 Enclosure (2×400HP)",
+            1, vsi["hp"], None, None,
+            flags=["Engineering quote required — no rate card price"]
+        )); sl += 1
+    else:
+        li = LineItem(str(sl), f"REMCO VSI-{vsi_key} with IP Protection",
+                      1, vsi["hp"], vsi["list"], vsi["best"])
+        if "flag" in vsi:
+            li.flags.append(vsi["flag"]); q.warnings.append(vsi["flag"])
+        q.sub_a_items.append(li); sl += 1
+
+    # MVF feeders (2 units feed VSI from surge bin)
+    mvf_key = _select_mvf(spec.tph)
+    mvf = rc.get_mvf(mvf_key)
+    if mvf:
+        q.sub_a_items.append(LineItem(str(sl),
+            f"Mechanical Vibratory Feeder MVF {mvf_key}",
+            2, 3.4 * 2, round(mvf["list"] * 2, 2), round(mvf["best"] * 2, 2))); sl += 1
+
+    # Final screen (3-deck for M-sand production, single unit)
+    scr_key = "2400x8100_3d"   # per PFD for 600 mt/h tertiary
+    ms = rc.get_screen(scr_key)
+    if ms:
+        q.sub_a_items.append(LineItem(str(sl),
+            f"Vibratory Screen {scr_key.upper()} (Final 3-Deck)",
+            1, ms["hp"], ms["list"], ms["best"])); sl += 1
+
+    # Metal detector
+    md = rc.METAL_DETECTOR
+    q.sub_a_items.append(LineItem(str(sl), "Metal Detector", 1, 0,
+        md["list"], md["best"])); sl += 1
+
+    # Motors for main equipment
+    total_a_hp = sum(i.hp for i in q.sub_a_items)
+    motor_cost = round(total_a_hp * 0.033, 2)
+    q.sub_a_items.append(LineItem(str(sl),
+        "Electrical Drive Motors for Main Equipment",
+        sl - 1, 0, motor_cost, motor_cost)); sl += 1
+
+    # Sub B — 4 belt conveyors (feed, VSI discharge, screen u/f, product stacker)
+    tph  = spec.tph
+    pw   = _conveyor_width(tph, "product")
+    mw   = _conveyor_width(tph, "main")
+    conv = [
+        ConveyorSpec("BC-01", mw,  10, _conveyor_hp(mw,  10), "surge_bin_to_vsi"),
+        ConveyorSpec("BC-02", mw,  18, _conveyor_hp(mw,  18), "vsi_discharge_to_screen"),
+        ConveyorSpec("BC-03", pw,  15, _conveyor_hp(pw,  15), "screen_underflow_product"),
+        ConveyorSpec("BC-04", mw,  30, _conveyor_hp(mw,  30), "product_stacker"),
+    ]
+    q.sub_b_conveyors = conv
+    q.sub_b_chutes_list, q.sub_b_chutes_best = _chutes_and_supports_cost(conv)
+
+    # Sub C — structural (lighter: just surge bin platform + screen frame + VSI frame)
+    struct_cost = round(
+        (rc.STRUCTURAL_TONNAGE.get("surge_hopper_30t_for_vsi", (9, 4))[0] * rc.STRUCTURAL_STEEL_RATE +
+         rc.STRUCTURAL_TONNAGE.get("screen_frame_zframe_walkway_stairs", (10, 6))[0] * rc.STRUCTURAL_STEEL_RATE +
+         rc.STRUCTURAL_TONNAGE.get("vsi_chutes_guards_misc", (3, 1))[0] * rc.STRUCTURAL_STEEL_RATE)
+        / 1_00_000, 2)
+    q.sub_c_structural_list = struct_cost
+    q.sub_c_structural_best = struct_cost
+
+    # Sub D — electrical (tertiary: simpler panel, fewer starters)
+    elec_list, elec_best = rc.ELECTRICAL.get("3stage_vsi5080_soft", (52, 36))
+    q.sub_d_list = round(elec_list * 0.55, 2)   # ~55% of full 3-stage (no primary/secondary section)
+    q.sub_d_best = round(elec_best * 0.55, 2)
+
+    # Sub E — erection (lighter than full 3-stage)
+    q.erection = round(rc.ERECTION.get("3stage", 12) * 0.4, 2)
 
     return q
 

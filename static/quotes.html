@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PROMAN — Standard Plant Quotations</title>
+<style>
+/* ── Reset & Base ─────────────────────────────────── */
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0D1B2A;color:#E2E8F0;font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh}
+
+/* ── Top Nav ──────────────────────────────────────── */
+.topnav{background:#0A1628;border-bottom:1px solid #1E3A5F;padding:0 20px;
+  display:flex;align-items:center;gap:20px;height:52px;position:sticky;top:0;z-index:100}
+.brand{font-size:18px;font-weight:700;color:#60A5FA;letter-spacing:.04em}
+.nav-links{display:flex;gap:4px;margin-left:auto}
+.nav-links a{color:#94A3B8;font-size:13px;padding:6px 12px;border-radius:6px;
+  text-decoration:none;transition:background .15s,color .15s}
+.nav-links a:hover,.nav-links a.active{background:#1E3A5F;color:#fff}
+
+/* ── Page wrapper ─────────────────────────────────── */
+.wrap{max-width:1200px;margin:0 auto;padding:24px 16px}
+
+/* ── Page header ──────────────────────────────────── */
+.page-hdr{margin-bottom:24px}
+.page-hdr h1{font-size:22px;font-weight:700;color:#F1F5F9;margin-bottom:4px}
+.page-hdr p{color:#64748B;font-size:13px}
+
+/* ── Filter bar ───────────────────────────────────── */
+.filter-bar{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;align-items:center}
+.filter-btn{padding:5px 14px;border-radius:20px;border:1px solid #1E3A5F;
+  background:transparent;color:#94A3B8;font-size:12px;cursor:pointer;transition:all .15s}
+.filter-btn:hover,.filter-btn.active{background:#1E3A5F;color:#fff;border-color:#2563EB}
+.search-box{margin-left:auto;padding:5px 12px;border-radius:6px;
+  border:1px solid #1E3A5F;background:#0F1C2E;color:#E2E8F0;font-size:13px;width:220px}
+.search-box:focus{outline:none;border-color:#2563EB}
+
+/* ── Config grid ──────────────────────────────────── */
+.config-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}
+
+/* ── Config card ──────────────────────────────────── */
+.card{background:#0F1C2E;border:1px solid #1E3A5F;border-radius:10px;
+  padding:0;overflow:hidden;display:flex;flex-direction:column;
+  transition:border-color .2s,box-shadow .2s}
+.card:hover{border-color:#2563EB;box-shadow:0 0 0 1px #2563EB22}
+
+.card-hdr{padding:14px 16px 10px;display:flex;align-items:flex-start;gap:10px}
+.card-icon{font-size:24px;flex-shrink:0;margin-top:2px}
+.card-title h2{font-size:15px;font-weight:700;color:#F1F5F9;margin-bottom:2px}
+.card-title .subtitle{font-size:11px;color:#60A5FA;font-weight:600;text-transform:uppercase;
+  letter-spacing:.06em}
+
+.card-body{padding:0 16px 14px;flex:1;display:flex;flex-direction:column;gap:10px}
+
+/* Spec pills row */
+.spec-pills{display:flex;flex-wrap:wrap;gap:5px}
+.pill{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;
+  border-radius:12px;font-size:11px;font-weight:500}
+.pill-tph {background:#1E3A5F;color:#93C5FD}
+.pill-mat {background:#1C2F1C;color:#86EFAC}
+.pill-stg {background:#2D1A1A;color:#FCA5A5}
+.pill-belt{background:#1E293B;color:#CBD5E1}
+.pill-area{background:#1E293B;color:#CBD5E1}
+
+/* Equipment desc */
+.equip-desc{font-size:12px;color:#94A3B8;line-height:1.6}
+
+/* Warnings block */
+.warnings{background:#1C1A00;border:1px solid #78350F;border-radius:6px;
+  padding:8px 10px;display:none}
+.warnings.has-warnings{display:block}
+.warnings .warn-title{font-size:11px;font-weight:600;color:#FCD34D;margin-bottom:4px}
+.warnings ul{padding-left:14px;font-size:11px;color:#FDE68A;line-height:1.7}
+
+/* HP / totals row */
+.totals-row{display:flex;gap:8px;margin-top:2px}
+.total-chip{flex:1;background:#0A1628;border:1px solid #1E3A5F;border-radius:6px;
+  padding:6px 10px;text-align:center}
+.total-chip .val{font-size:16px;font-weight:700;color:#60A5FA}
+.total-chip .lbl{font-size:10px;color:#64748B;margin-top:1px}
+
+/* Loading spinner inside chip */
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid #1E3A5F;
+  border-top-color:#60A5FA;border-radius:50%;animation:spin .7s linear infinite;
+  vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Action buttons */
+.card-actions{padding:12px 16px;border-top:1px solid #1E3A5F;display:flex;gap:8px}
+.btn{flex:1;padding:8px 12px;border-radius:7px;font-size:12px;font-weight:600;
+  cursor:pointer;border:none;display:flex;align-items:center;justify-content:center;
+  gap:6px;transition:opacity .15s,filter .15s;text-decoration:none}
+.btn:hover{opacity:.85;filter:brightness(1.1)}
+.btn-excel{background:#1D6F42;color:#fff}
+.btn-pfd  {background:#1E3A5F;color:#93C5FD;border:1px solid #2563EB}
+.btn:disabled{opacity:.4;cursor:not-allowed;filter:none}
+
+/* Status badge on Excel button */
+.btn-excel.loading .btn-lbl::after{content:" …"}
+.btn-excel.done .btn-lbl::after{content:" ✓"}
+.btn-excel.error .btn-lbl::after{content:" ✗"}
+
+/* ── Summary bar ──────────────────────────────────── */
+.summary-bar{background:#0A1628;border:1px solid #1E3A5F;border-radius:8px;
+  padding:12px 16px;margin-bottom:20px;display:flex;gap:24px;flex-wrap:wrap}
+.sbar-item{text-align:center}
+.sbar-val{font-size:20px;font-weight:700;color:#60A5FA}
+.sbar-lbl{font-size:11px;color:#64748B;margin-top:2px}
+
+/* ── Toast ────────────────────────────────────────── */
+#toast{position:fixed;bottom:24px;right:24px;background:#1D6F42;color:#fff;
+  padding:10px 18px;border-radius:8px;font-size:13px;box-shadow:0 4px 12px #0004;
+  opacity:0;transition:opacity .3s;pointer-events:none;z-index:999}
+#toast.show{opacity:1}
+#toast.error{background:#7F1D1D}
+</style>
+</head>
+<body>
+
+<nav class="topnav">
+  <span class="brand">PROMAN</span>
+  <div class="nav-links">
+    <a href="/">Dashboard</a>
+    <a href="/quotes" class="active">Quotations</a>
+    <a href="/layout3d?tph=300&stages=3&material=Limestone">3D Layout</a>
+    <a href="/masters">Masters</a>
+    <a href="/logout">Logout</a>
+  </div>
+</nav>
+
+<div class="wrap">
+  <div class="page-hdr">
+    <h1>Standard Plant Quotations</h1>
+    <p>Generate price schedule Excel for any of the 7 catalogued PROMAN plant configurations.</p>
+  </div>
+
+  <div class="summary-bar">
+    <div class="sbar-item"><div class="sbar-val">7</div><div class="sbar-lbl">Configurations</div></div>
+    <div class="sbar-item"><div class="sbar-val">150–600</div><div class="sbar-lbl">TPH Range</div></div>
+    <div class="sbar-item"><div class="sbar-val">2 / 3 / Tert</div><div class="sbar-lbl">Stage Options</div></div>
+    <div class="sbar-item"><div class="sbar-val" id="total-dl">0</div><div class="sbar-lbl">Downloads This Session</div></div>
+  </div>
+
+  <div class="filter-bar">
+    <button class="filter-btn active" data-filter="all">All</button>
+    <button class="filter-btn" data-filter="2">2-Stage</button>
+    <button class="filter-btn" data-filter="3">3-Stage</button>
+    <button class="filter-btn" data-filter="tertiary">Tertiary</button>
+    <input class="search-box" type="search" placeholder="Search configs…" id="search-input">
+  </div>
+
+  <div class="config-grid" id="card-grid"></div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const CONFIGS = [
+  {
+    key:"150_2s", label:"150 TPH — 2-Stage", icon:"⚙️",
+    tph:150, stages:2, material:"Granite / Basalt", belts:12,
+    area:"85 × 40 m (est.)",
+    description:"VGF 1.0m×4m · PROJaw 3624 (CSS 110mm) · PROCone-3510 (CSS 32mm) · 4-Deck 2.0m×6.0m Screen",
+    pfd:"/pfd/150/2?material=Granite",
+    warnings:[]
+  },
+  {
+    key:"150_3s", label:"150 TPH — 3-Stage", icon:"🔁",
+    tph:150, stages:3, material:"Granite / Basalt", belts:16,
+    area:"95 × 45 m (est.)",
+    description:"VGF 1.0m×4m · PROJaw 3624 (CSS 110mm) · PROCone-3510 (CSS 28mm) · VSI-200 Tertiary · 4-Deck Screen",
+    pfd:"/pfd/150/3?material=Granite",
+    warnings:[]
+  },
+  {
+    key:"250_2s", label:"250 TPH — 2-Stage", icon:"⚙️",
+    tph:250, stages:2, material:"Granite", belts:12,
+    area:"100 × 45 m (est.)",
+    description:"VGF 1.2m×5m · PROJaw 4230 (CSS 110mm) · PROCone-4510 (CSS 30mm) · 4-Deck 2.0m×6.0m Screen",
+    pfd:"/pfd/250/2?material=Granite",
+    warnings:[]
+  },
+  {
+    key:"250_3s", label:"250 TPH — 3-Stage", icon:"🔁",
+    tph:250, stages:3, material:"Basalt", belts:16,
+    area:"110 × 50 m (est.)",
+    description:"VGF 1.2m×5m · PROJaw 4230 (CSS 127mm) · PROCone-4510 (CSS 32mm) · VSI-300 Tertiary · 4-Deck Screen",
+    pfd:"/pfd/250/3?material=Basalt",
+    warnings:[]
+  },
+  {
+    key:"300_3s", label:"300 TPH — 3-Stage", icon:"🔁",
+    tph:300, stages:3, material:"Limestone", belts:16,
+    area:"120 × 55 m (est.)",
+    description:"VGF 1.2m×5m · PROJaw 4230 (CSS 152mm) · PROCone-5010 (CSS 34mm) · VSI-4060 (2×300HP) · 2.0m×5m + 2.0m×7m Screens",
+    pfd:"/pfd/300/3?material=Limestone",
+    warnings:["VSI-4060: rate-card key is 2×250HP variant — engine will flag difference; verify before sending."]
+  },
+  {
+    key:"600_3s", label:"600 TPH — 3-Stage", icon:"🏭",
+    tph:600, stages:3, material:"Gabro", belts:16,
+    area:"145 × 85 m (layout confirmed)",
+    description:"VGF 1.3m×5.6m · PROJaw 49×38 · 2×PROCone-5010 (twin 50-50) · VSI-5080 (2×400HP) · 2× 2.4m×8.1m Screens",
+    pfd:"/pfd/600/3?material=Gabro",
+    warnings:[
+      "VSI-5080 (2×400HP): NO rate-card price — engineering/sales quote required.",
+      "PROJaw 50×40 price anomaly flagged — confirm with sales before sending proposal.",
+      "Twin PROCone-5010 (qty 2): engine books both, costs doubled."
+    ]
+  },
+  {
+    key:"vsi5080", label:"Tertiary Standalone VSI-5080", icon:"🌀",
+    tph:600, stages:0, material:"Gabro", belts:4,
+    area:"60 × 30 m (est.)",
+    description:"Surge Bin + 2×MVF + VSI-5080 (2×400HP) + Screen 2.4m×8.1m 3-Deck — Feed: -50mm crushed stone, 600 mt/h",
+    pfd:"/pfd/600/0?material=Gabro",
+    warnings:[
+      "VSI-5080 (2×400HP): NO rate-card price — engineering/sales quote required.",
+      "Tertiary-only plant: no jaw/cone in this config."
+    ]
+  }
+];
+
+let sessionDownloads = 0;
+
+function stageLabel(s){
+  if(s===0) return "Tertiary";
+  return `${s}-Stage`;
+}
+
+function renderCard(cfg){
+  const hasWarn = cfg.warnings.length > 0;
+  const warnHtml = hasWarn
+    ? `<div class="warnings has-warnings">
+         <div class="warn-title">⚠️ Pricing Flags</div>
+         <ul>${cfg.warnings.map(w=>`<li>${w}</li>`).join("")}</ul>
+       </div>`
+    : "";
+
+  const stageFilter = cfg.stages === 0 ? "tertiary" : String(cfg.stages);
+
+  return `
+  <div class="card" data-key="${cfg.key}" data-stage="${stageFilter}" data-label="${cfg.label.toLowerCase()}">
+    <div class="card-hdr">
+      <div class="card-icon">${cfg.icon}</div>
+      <div class="card-title">
+        <h2>${cfg.label}</h2>
+        <div class="subtitle">${stageLabel(cfg.stages)} Plant · ${cfg.material}</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="spec-pills">
+        <span class="pill pill-tph">⚡ ${cfg.tph} TPH</span>
+        <span class="pill pill-stg">${stageLabel(cfg.stages)}</span>
+        <span class="pill pill-mat">${cfg.material}</span>
+        <span class="pill pill-belt">🔗 ${cfg.belts} Belts</span>
+        <span class="pill pill-area">📐 ${cfg.area}</span>
+      </div>
+      <div class="equip-desc">${cfg.description}</div>
+      ${warnHtml}
+      <div class="totals-row">
+        <div class="total-chip" id="hp-${cfg.key}">
+          <div class="val"><span class="spinner"></span></div>
+          <div class="lbl">Total HP</div>
+        </div>
+        <div class="total-chip" id="cost-${cfg.key}">
+          <div class="val"><span class="spinner"></span></div>
+          <div class="lbl">Best Price (₹ Lakhs)</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-actions">
+      <button class="btn btn-excel" id="dl-${cfg.key}" onclick="downloadExcel('${cfg.key}', this)">
+        <span>📊</span><span class="btn-lbl">Download Excel</span>
+      </button>
+      <a class="btn btn-pfd" href="${cfg.pfd}" target="_blank">
+        <span>📋</span><span>View PFD</span>
+      </a>
+    </div>
+  </div>`;
+}
+
+// Render all cards
+const grid = document.getElementById("card-grid");
+grid.innerHTML = CONFIGS.map(renderCard).join("");
+
+// Load summaries from API
+async function loadSummaries(){
+  for(const cfg of CONFIGS){
+    try{
+      const r = await fetch(`/api/quotes/summary?config=${cfg.key}`,{credentials:"include"});
+      if(!r.ok) throw new Error(r.statusText);
+      const d = await r.json();
+      const hp   = document.querySelector(`#hp-${cfg.key} .val`);
+      const cost = document.querySelector(`#cost-${cfg.key} .val`);
+      if(hp)   hp.textContent   = d.total_hp   != null ? d.total_hp.toLocaleString() + " HP" : "—";
+      if(cost) cost.textContent = d.best_price  != null ? "₹ " + d.best_price.toFixed(1)     : "Eng. Quote";
+    }catch(e){
+      const hp   = document.querySelector(`#hp-${cfg.key} .val`);
+      const cost = document.querySelector(`#cost-${cfg.key} .val`);
+      if(hp)   hp.textContent   = "—";
+      if(cost) cost.textContent = "—";
+    }
+  }
+}
+loadSummaries();
+
+// Download Excel
+async function downloadExcel(key, btn){
+  btn.disabled = true;
+  btn.classList.add("loading");
+  const lbl = btn.querySelector(".btn-lbl");
+  const orig = lbl.textContent;
+  lbl.textContent = "Generating…";
+
+  try{
+    const r = await fetch(`/api/quotes/excel?config=${key}`,{credentials:"include"});
+    if(!r.ok){
+      const err = await r.json().catch(()=>({detail:"Server error"}));
+      throw new Error(err.detail || r.statusText);
+    }
+    const blob = await r.blob();
+    const cd   = r.headers.get("content-disposition") || "";
+    const name = cd.match(/filename="?([^";]+)"?/)?.[1] || `PROMAN_${key}.xlsx`;
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href = url; a.download = name; a.click();
+    URL.revokeObjectURL(url);
+
+    btn.classList.remove("loading"); btn.classList.add("done");
+    lbl.textContent = "Downloaded";
+    sessionDownloads++;
+    document.getElementById("total-dl").textContent = sessionDownloads;
+    showToast("✓ Excel downloaded: " + name);
+    setTimeout(()=>{ btn.classList.remove("done"); lbl.textContent=orig; btn.disabled=false; },3000);
+  }catch(e){
+    btn.classList.remove("loading"); btn.classList.add("error");
+    lbl.textContent = "Error";
+    showToast("✗ " + e.message, true);
+    setTimeout(()=>{ btn.classList.remove("error"); lbl.textContent=orig; btn.disabled=false; },3000);
+  }
+}
+
+// Filter buttons
+document.querySelectorAll(".filter-btn").forEach(btn=>{
+  btn.addEventListener("click",()=>{
+    document.querySelectorAll(".filter-btn").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+    applyFilter();
+  });
+});
+
+// Search
+document.getElementById("search-input").addEventListener("input", applyFilter);
+
+function applyFilter(){
+  const stage  = document.querySelector(".filter-btn.active").dataset.filter;
+  const search = document.getElementById("search-input").value.toLowerCase();
+  document.querySelectorAll(".card").forEach(card=>{
+    const matchStage  = stage==="all" || card.dataset.stage===stage;
+    const matchSearch = !search || card.dataset.label.includes(search);
+    card.style.display = matchStage && matchSearch ? "" : "none";
+  });
+}
+
+// Toast
+function showToast(msg, isError=false){
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.className   = isError ? "error show" : "show";
+  setTimeout(()=>t.className="", 3500);
+}
+</script>
+</body>
+</html>

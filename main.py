@@ -23,7 +23,8 @@ from auth import (
 )
 
 import rate_card as rc
-from engine import PlantSpec, Quotation, build_quotation, quote_standalone_equipment
+from engine import (PlantSpec, Quotation, build_quotation, quote_standalone_equipment,
+                    build_tertiary_quotation)
 from triage import triage_enquiry
 from generate_xlsx import build_workbook
 from generate_offer_letter import build_offer_letter, build_standalone_letter
@@ -35,6 +36,7 @@ import masters_manager as mm
 from equipment_selector import build_equipment_schedule, build_tertiary_schedule
 from procurement_bom import build_procurement_bom
 from pfd_generator import generate_pfd_html
+from quotation_configs import ALL_CONFIGS, get_config
 
 # ---------------------------------------------------------------------------
 app = FastAPI(title="PROMAN Quotation Engine", version="1.0.0")
@@ -582,6 +584,112 @@ async def get_3d_layout_data(
             "schedule": schedule, "positions": positions, "bom": bom,
             "procurement_bom": proc_bom,
             "plant_length_m": schedule.get("_plant_length_m", 0)}
+
+
+@app.get("/quotes", response_class=HTMLResponse)
+async def quotes_page(_: dict = Depends(require_login)):
+    """Serve the standard quotation dashboard."""
+    p = STATIC / "quotes.html"
+    return HTMLResponse(content=p.read_text())
+
+
+@app.get("/api/quotes/list")
+async def list_quotes(_: dict = Depends(require_login)):
+    """Return metadata for all 7 standard configurations (no pricing computed)."""
+    return [
+        {
+            "key":      k,
+            "label":    v["label"],
+            "tph":      v["tph"],
+            "stages":   v["stages"],
+            "material": v["material"],
+            "belts":    v.get("conveyor_count"),
+            "area":     v.get("area_m2"),
+            "pfd_url":  v.get("pfd_url"),
+            "warnings": v.get("warnings", []),
+        }
+        for k, v in ALL_CONFIGS.items()
+    ]
+
+
+@app.get("/api/quotes/summary")
+async def quote_summary(config: str, _: dict = Depends(require_login)):
+    """
+    Return a lightweight summary (total HP, best price total) for one config.
+    Runs the engine but does NOT write any file — used to populate card chips on the UI.
+    """
+    try:
+        cfg = get_config(config)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    spec = cfg["spec"]
+    try:
+        if getattr(spec, "_tertiary_only", False):
+            q = build_tertiary_quotation(spec)
+        else:
+            q = build_quotation(spec)
+
+        best = q.grand_total_best()
+        return {
+            "config":      config,
+            "total_hp":    q.total_hp(),
+            "best_price":  best if best > 0 else None,
+            "list_price":  q.grand_total_list() or None,
+            "sub_a_best":  q.sub_a_best(),
+            "warnings":    q.warnings,
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Engine error: {exc}")
+
+
+@app.get("/api/quotes/excel")
+async def download_quote_excel(
+    config: str,
+    client: str = "Enquiry Client",
+    _: dict = Depends(require_login),
+):
+    """
+    Generate and download a price schedule Excel for one of the 7 standard configs.
+    Query param: config=150_2s | 150_3s | 250_2s | 250_3s | 300_3s | 600_3s | vsi5080
+    Optional:    client=<client name> (appears in sheet header)
+    """
+    import io, tempfile
+    from generate_xlsx import build_workbook
+
+    try:
+        cfg_meta = get_config(config)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    spec = cfg_meta["spec"]
+    # Override client name if supplied — use dataclasses.replace for a clean copy
+    if client and client != "Enquiry Client":
+        import dataclasses
+        spec = dataclasses.replace(spec, client_name=client)
+
+    try:
+        if getattr(spec, "_tertiary_only", False):
+            q = build_tertiary_quotation(spec)
+        else:
+            q = build_quotation(spec)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Engine error: {exc}")
+
+    # Write to temp file then stream back
+    tmp = TMP / f"PROMAN_{config}_{date.today().strftime('%Y%m%d')}.xlsx"
+    try:
+        build_workbook(q, str(tmp))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Excel build error: {exc}")
+
+    safe_config = config.replace("/", "-").replace(" ", "_")
+    fname = f"PROMAN_{safe_config}_{spec.tph}TPH_{date.today().strftime('%d%b%Y')}.xlsx"
+    return FileResponse(
+        str(tmp),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
 
 
 @app.get("/pfd/{tph}/{stages}", response_class=HTMLResponse)
