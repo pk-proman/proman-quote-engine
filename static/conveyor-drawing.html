@@ -342,489 +342,746 @@ function renderDrawing() {
 // SVG DRAWING BUILDERS
 // ─────────────────────────────────────────────────────────────────────────────
 
-function mm2px(mm, scale) { return mm / 1000 * PX_M * scale; }
+// Isometric projection helper
+function iso(wx, wy, wz, s, ox, oy) {
+  // wx = horizontal along conveyor, wy = depth (belt width), wz = vertical rise
+  const cos30 = Math.cos(30*Math.PI/180), sin30 = Math.sin(30*Math.PI/180);
+  return {
+    x: ox + (wx - wy) * cos30 * s,
+    y: oy - wz * s + (wx + wy) * sin30 * s
+  };
+}
 
-// ELEVATION (side view)
+// ─── SHARED HELPERS ──────────────────────────────────────────────────────────
+function plummerBlock(px, py, bw, bh, s) {
+  return `<rect x="${px-bw/2}" y="${py-bh/2}" width="${bw}" height="${bh}" fill="#7f8c8d" stroke="#455a64" stroke-width="${Math.max(1,1.5*s)}" rx="2"/>
+    <ellipse cx="${px}" cy="${py}" rx="${bw*0.22}" ry="${bh*0.22}" fill="#95a5a6" stroke="#607d8b" stroke-width="0.8"/>
+    <rect x="${px-bw/2}" y="${py+bh/2-bh*0.15}" width="${bw}" height="${bh*0.15}" fill="#546e7a"/>
+    <circle cx="${px-bw*0.28}" cy="${py-bh*0.36}" r="${2*s}" fill="#ecf0f1"/>
+    <circle cx="${px+bw*0.28}" cy="${py-bh*0.36}" r="${2*s}" fill="#ecf0f1"/>`;
+}
+function solePlate(px, py, pw, ph) {
+  return `<rect x="${px-pw/2}" y="${py}" width="${pw}" height="${ph}" fill="#37474f" stroke="#263238" stroke-width="1" rx="1"/>`;
+}
+function lockBush(cx, cy, r) {
+  return `<polygon points="${cx-r*0.32},${cy-r*0.17} ${cx-r*0.58},${cy-r*0.36} ${cx-r*0.58},${cy+r*0.36} ${cx-r*0.32},${cy+r*0.17}" fill="#f9a825" stroke="#f57f17" stroke-width="0.8"/>
+    <polygon points="${cx+r*0.32},${cy-r*0.17} ${cx+r*0.58},${cy-r*0.36} ${cx+r*0.58},${cy+r*0.36} ${cx+r*0.32},${cy+r*0.17}" fill="#f9a825" stroke="#f57f17" stroke-width="0.8"/>`;
+}
+// Red dimension line helper (matches reference drawing style)
+function dimRed(x1,y1,x2,y2,label,extPx,fs) {
+  const dx=x2-x1,dy=y2-y1,len=Math.sqrt(dx*dx+dy*dy);
+  if(len<1) return '';
+  const ux=dx/len,uy=dy/len,nx=-uy,ny=ux;
+  const e=extPx||18;
+  const ax1=x1+nx*e, ay1=y1+ny*e, ax2=x2+nx*e, ay2=y2+ny*e;
+  const mx=(ax1+ax2)/2, my=(ay1+ay2)/2;
+  const textAngle=Math.abs(dx)>Math.abs(dy)?0:( dy>0?90:-90);
+  return `<line x1="${x1+nx*4}" y1="${y1+ny*4}" x2="${ax1}" y2="${ay1}" stroke="#e53935" stroke-width="1"/>
+    <line x1="${x2+nx*4}" y1="${y2+ny*4}" x2="${ax2}" y2="${ay2}" stroke="#e53935" stroke-width="1"/>
+    <line x1="${ax1}" y1="${ay1}" x2="${ax2}" y2="${ay2}" stroke="#e53935" stroke-width="1.5" marker-start="url(#arr-red)" marker-end="url(#arr-red-r)"/>
+    <text x="${mx}" y="${my}" text-anchor="middle" dominant-baseline="middle" font-size="${fs||9}" fill="#e53935" font-weight="bold" font-family="Arial" transform="rotate(${textAngle},${mx},${my})">${label}</text>`;
+}
+function svgDefsNew() {
+  return `<defs>
+    <marker id="arr" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#e53935"/></marker>
+    <marker id="arr-red" markerWidth="6" markerHeight="6" refX="0" refY="3" orient="auto"><path d="M6,0 L0,3 L6,6 Z" fill="#e53935"/></marker>
+    <marker id="arr-red-r" markerWidth="6" markerHeight="6" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#e53935"/></marker>
+    <marker id="arr-blk" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#333"/></marker>
+    <pattern id="xhatch" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
+      <line x1="0" y1="0" x2="0" y2="6" stroke="#888" stroke-width="1.2"/>
+    </pattern>
+    <pattern id="hopperHatch" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
+      <line x1="0" y1="0" x2="0" y2="8" stroke="#546e7a" stroke-width="1"/>
+    </pattern>
+    <filter id="sh"><feDropShadow dx="1" dy="1" stdDeviation="1.5" flood-opacity="0.15"/></filter>
+  </defs>`;
+}
+// Numbered callout balloon matching reference style
+function calloutRef(ax,ay,lx,ly,num) {
+  const r=11;
+  return `<line x1="${ax}" y1="${ay}" x2="${lx}" y2="${ly}" stroke="#1a3a5c" stroke-width="1"/>
+    <circle cx="${lx}" cy="${ly}" r="${r}" fill="#1a3a5c" stroke="white" stroke-width="1.5"/>
+    <text x="${lx}" y="${ly+1}" text-anchor="middle" dominant-baseline="middle" font-size="9" fill="white" font-weight="bold" font-family="Arial">${num}</text>`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ELEVATION  —  matches reference drawing style (blue frame, red dims, numbered)
+// ─────────────────────────────────────────────────────────────────────────────
 function buildElevationSVG(b, scale) {
-  const L  = b.length_m * PX_M * scale;       // C-C length in px
+  const s = scale;
+  // Target ~1800px wide for the conveyor body
+  const TARGET_L = Math.max(1400, Math.min(2800, b.length_m * 85));
+  const PM = TARGET_L / b.length_m * s;
+
   const ang = b.incline_deg * Math.PI / 180;
-  const dX = L * Math.cos(ang);
-  const dY = L * Math.sin(ang);
-  const hp = mm2px(b.head_pulley_dia_mm, scale);
-  const tp = mm2px(b.tail_pulley_dia_mm, scale);
-  const sp = mm2px(b.snub_pulley_dia_mm, scale);
-  const bp = mm2px(b.bend_pulley_dia_mm, scale);
-  const bw = mm2px(b.width_mm, scale);          // belt width in px (used as frame height reference)
-  const margin = 80 * scale;
-  const W = dX + margin * 2 + 80 * scale;
-  const H = dY + margin * 2 + 100 * scale;
-  const ox = margin;             // tail origin X
-  const oy = H - margin - 30 * scale;  // tail origin Y (bottom)
-  const hx = ox + dX;           // head X
-  const hy = oy - dY;           // head Y (higher)
+  const cA = Math.cos(ang), sA = Math.sin(ang);
+  const L  = b.length_m * PM;
+  const dX = L * cA, dY = L * sA;
 
-  // frame beam thickness
-  const ft = Math.max(4, 6 * scale);
-  // belt offset above centre line (half belt width conceptually = 10% of L)
-  const beltOff = bw * 0.12;
+  // Component sizes (px) derived from belt spec
+  const HP_R  = Math.max(20, b.head_pulley_dia_mm / 1000 * PM / 2);
+  const TP_R  = Math.max(20, b.tail_pulley_dia_mm / 1000 * PM / 2);
+  const SP_R  = Math.max(13, b.snub_pulley_dia_mm / 1000 * PM / 2);
+  const BW    = b.width_mm / 1000 * PM;
+  const FW    = (b.width_mm + 400) / 1000 * PM;   // frame width
+  const FH    = Math.max(12, BW * 0.16);           // frame channel height
+  const bT    = Math.max(3, BW * 0.03);
+  const LEG_W = Math.max(8, FW * 0.04);
+  const legH  = Math.max(55, HP_R * 2.2);          // support leg height
 
-  // carrying top belt line
-  const topBx1 = ox + tp/2 * Math.cos(ang);
-  const topBy1 = oy - tp/2 * Math.sin(ang) - beltOff;
-  const topBx2 = hx - hp/2 * Math.cos(ang);
-  const topBy2 = hy + hp/2 * Math.sin(ang) - beltOff;
-  // return bottom belt line
-  const retBx1 = ox + tp/2 * Math.cos(ang);
-  const retBy1 = oy - tp/2 * Math.sin(ang) + beltOff;
-  const retBx2 = hx - hp/2 * Math.cos(ang);
-  const retBy2 = hy + hp/2 * Math.sin(ang) + beltOff;
+  // Heights at head/tail for reference dims
+  const tailH_mm = Math.round(legH / PM * 1000 + b.tail_pulley_dia_mm / 2);
+  const headH_mm = Math.round((legH + dY) / PM * 1000 + b.head_pulley_dia_mm / 2);
 
-  // idler positions along carrying strand
-  const ci_pitch = Math.max(1, b.carrying_idler_pitch_mm || 1200) / 1000 * PX_M * scale;
-  const ri_pitch = Math.max(1, b.return_idler_pitch_mm   || 3000) / 1000 * PX_M * scale;
-  const ii_pitch = Math.max(1, b.impact_idler_pitch_mm   || 150)  / 1000 * PX_M * scale;
+  // SVG layout
+  const padL = 80*s, padR = 200*s, padT = 50*s;
+  const dimSpace = 55*s;
+  const W = dX + padL + padR + HP_R*2;
+  const H = dY + legH + padT + 60*s;
+  const ox = padL + TP_R;
+  const oy = H - 50*s - legH;
+  const hx = ox + dX, hy = oy - dY;
 
-  let carrying_idlers = '';
-  let n_ci = Math.min(200, Math.floor(L / ci_pitch));  // cap at 200 to prevent runaway loops
-  for (let i = 1; i < n_ci; i++) {
-    const t  = i * ci_pitch / L;
-    const ix = ox + dX * t;
-    const iy = oy - dY * t;
-    const ir = Math.max(3, 5 * scale);
-    carrying_idlers += `<circle cx="${ix}" cy="${iy - beltOff}" r="${ir}" fill="#555" stroke="#333" stroke-width="1"/>`;
-  }
-  // impact idlers near tail (3 sets)
-  for (let i = 0; i < 3; i++) {
-    const t  = (i+1) * ii_pitch / L;
-    const ix = ox + dX * t;
-    const iy = oy - dY * t;
-    const ir = Math.max(4, 6 * scale);
-    carrying_idlers += `<circle cx="${ix}" cy="${iy - beltOff}" r="${ir}" fill="#c0392b" stroke="#922b21" stroke-width="1"/>`;
-  }
-  // return idlers
-  let return_idlers = '';
-  let n_ri = Math.min(100, Math.floor(L / ri_pitch));
-  for (let i = 1; i < n_ri; i++) {
-    const t  = i * ri_pitch / L;
-    const ix = ox + dX * t;
-    const iy = oy - dY * t;
-    const ir = Math.max(2, 4 * scale);
-    return_idlers += `<circle cx="${ix}" cy="${iy + beltOff}" r="${ir}" fill="#888" stroke="#555" stroke-width="0.5"/>`;
+  // ── LEGS ──
+  const legPitch = PM * 5.5;
+  const nLegs = Math.max(2, Math.floor(L / legPitch));
+  let legs = '';
+  for (let i = 0; i <= nLegs; i++) {
+    const t = i / nLegs;
+    const lx = ox + dX*t, ly = oy - dY*t;
+    const groundY = ly + legH + dY * t * 0.25;
+    // Blue structural leg column
+    legs += `<rect x="${lx - LEG_W/2}" y="${ly}" width="${LEG_W}" height="${groundY - ly}" fill="#1565c0" stroke="#0d47a1" stroke-width="1"/>`;
+    // Diagonal braces
+    legs += `<polygon points="${lx},${ly} ${lx-LEG_W*2},${ly+LEG_W*4} ${lx},${ly+LEG_W*4}" fill="#1e88e5" opacity="0.6"/>`;
+    legs += `<polygon points="${lx},${ly} ${lx+LEG_W*2},${ly+LEG_W*4} ${lx},${ly+LEG_W*4}" fill="#1e88e5" opacity="0.6"/>`;
+    // Base plate
+    legs += `<rect x="${lx-LEG_W*2.5}" y="${groundY}" width="${LEG_W*5}" height="${LEG_W*0.7}" fill="#0d47a1" rx="1"/>`;
+    // Anchor bolts
+    legs += `<circle cx="${lx-LEG_W*1.8}" cy="${groundY+LEG_W*0.35}" r="${LEG_W*0.35}" fill="#ffd600"/>`;
+    legs += `<circle cx="${lx+LEG_W*1.8}" cy="${groundY+LEG_W*0.35}" r="${LEG_W*0.35}" fill="#ffd600"/>`;
   }
 
-  // truss frame (zigzag diagonals every ~3m)
-  let truss = '';
+  // ── STRUCTURAL FRAME (blue) ──
+  // Top chord (under carrying belt)
+  const bUp = BW * 0.11;
+  const frameTopY_ox = oy - bUp;
+  const frameTopY_hx = hy - bUp;
+  let frame = '';
+  // Top stringer
+  frame += `<line x1="${ox}" y1="${frameTopY_ox}" x2="${hx}" y2="${frameTopY_hx}" stroke="#1565c0" stroke-width="${Math.max(4, FH*0.35)}"/>`;
+  // Bottom stringer (return belt side)
+  const bDn = BW * 0.07;
+  frame += `<line x1="${ox}" y1="${oy+bDn+FH}" x2="${hx}" y2="${hy+bDn+FH}" stroke="#1565c0" stroke-width="${Math.max(3, FH*0.28)}"/>`;
+  // Cross-members / vertical stiffeners
+  const nStiff = Math.min(20, Math.floor(L / (PM * 2)));
+  for (let i = 1; i < nStiff; i++) {
+    const t = i/nStiff;
+    frame += `<line x1="${ox+dX*t}" y1="${oy-dY*t-bUp}" x2="${ox+dX*t}" y2="${oy-dY*t+bDn+FH}" stroke="#1976d2" stroke-width="${Math.max(1.5,FH*0.15)}" stroke-dasharray="4,3"/>`;
+  }
+  // If truss: add diagonals
   if (b.frame_type === 'truss') {
-    const seg = Math.max(2, PX_M * scale * 3);
-    const n_segs = Math.floor(L / seg);
-    for (let i = 0; i < n_segs; i++) {
-      const t1 = i     * seg / L, t2 = (i+1) * seg / L;
-      const x1 = ox + dX*t1, y1 = oy - dY*t1;
-      const x2 = ox + dX*t2, y2 = oy - dY*t2;
-      const frameH = Math.max(12, 16 * scale);
-      // lower chord
-      const perpX = Math.sin(ang) * frameH;
-      const perpY = Math.cos(ang) * frameH;
-      if (i % 2 === 0) {
-        truss += `<line x1="${x1}" y1="${y1+perpY}" x2="${x2}" y2="${y2-perpY}" stroke="#777" stroke-width="${Math.max(1,1.5*scale)}" stroke-dasharray="2,2"/>`;
-      } else {
-        truss += `<line x1="${x1}" y1="${y1-perpY}" x2="${x2}" y2="${y2+perpY}" stroke="#777" stroke-width="${Math.max(1,1.5*scale)}" stroke-dasharray="2,2"/>`;
-      }
+    const nSeg = Math.min(24, Math.ceil(L/PM/3.5));
+    for (let i = 0; i < nSeg; i++) {
+      const t1=i/nSeg, t2=(i+1)/nSeg;
+      const x1=ox+dX*t1, y1u=oy-dY*t1-bUp, y1d=oy-dY*t1+bDn+FH;
+      const x2=ox+dX*t2, y2u=oy-dY*t2-bUp, y2d=oy-dY*t2+bDn+FH;
+      frame += i%2===0
+        ? `<line x1="${x1}" y1="${y1u}" x2="${x2}" y2="${y2d}" stroke="#1e88e5" stroke-width="1.5"/>`
+        : `<line x1="${x1}" y1="${y1d}" x2="${x2}" y2="${y2u}" stroke="#1e88e5" stroke-width="1.5"/>`;
     }
   }
+  // Head end support frame (vertical blue posts)
+  frame += `<rect x="${hx-FW*0.04}" y="${hy}" width="${FW*0.08}" height="${legH*0.6+dY*0.5}" fill="#1565c0" stroke="#0d47a1" stroke-width="1"/>`;
 
-  // take-up assembly near tail
+  // ── BELT ──
+  const belt = `
+    <line x1="${ox+TP_R*cA}" y1="${oy-TP_R*sA}" x2="${hx-HP_R*cA}" y2="${hy+HP_R*sA}" stroke="#111" stroke-width="${Math.max(bT+1,3)}"/>
+    <line x1="${ox+TP_R*cA}" y1="${oy-TP_R*sA+bDn}" x2="${hx-HP_R*cA}" y2="${hy+HP_R*sA+bDn}" stroke="#333" stroke-width="${Math.max(bT*0.7,2)}" stroke-dasharray="12,6" opacity="0.7"/>`;
+
+  // ── IDLERS ──
+  const ci_mm = Math.max(1, b.carrying_idler_pitch_mm || 1200);
+  const ci_px = ci_mm / 1000 * PM;
+  const n_ci  = Math.min(80, Math.floor(L / ci_px));
+  const IR    = Math.max(5, BW * 0.06);
+  let idlers = '';
+  // Impact idlers (3 sets, red, at tail)
+  for (let i = 1; i <= 3; i++) {
+    const t = i * (150/1000*PM) / L;
+    if (t > 0.3) break;
+    const ix = ox + dX*t, iy = oy - dY*t;
+    idlers += `<circle cx="${ix}" cy="${iy-bUp}" r="${IR}" fill="#c62828" stroke="#7b1111" stroke-width="1.5"/>`;
+    idlers += `<circle cx="${ix}" cy="${iy-bUp}" r="${IR*0.4}" fill="#ef5350"/>`;
+  }
+  // Transition idlers (2 sets, orange)
+  for (let i = 1; i <= 2; i++) {
+    const t = 3 * (150/1000*PM) / L + i * ci_px/L;
+    if (t > 0.3) break;
+    const ix = ox + dX*t, iy = oy - dY*t;
+    idlers += `<circle cx="${ix}" cy="${iy-bUp}" r="${IR}" fill="#e65100" stroke="#bf360c" stroke-width="1.5"/>`;
+  }
+  // Regular carrying idlers (dark/black circles + idler frame cross)
+  for (let i = 3; i < n_ci; i++) {
+    const t = i/n_ci;
+    const ix = ox+dX*t, iy = oy-dY*t;
+    idlers += `<circle cx="${ix}" cy="${iy-bUp}" r="${IR}" fill="#1a1a1a" stroke="#333" stroke-width="1"/>`;
+    idlers += `<line x1="${ix-IR}" y1="${iy-bUp}" x2="${ix+IR}" y2="${iy-bUp}" stroke="#555" stroke-width="0.6"/>`;
+  }
+  // Return idlers (grey, below belt)
+  const ri_mm = Math.max(1, b.return_idler_pitch_mm || 3000);
+  const ri_px = ri_mm / 1000 * PM;
+  const n_ri  = Math.min(30, Math.floor(L / ri_px));
+  for (let i = 1; i < n_ri; i++) {
+    const t = i/n_ri;
+    const ix = ox+dX*t, iy = oy-dY*t;
+    idlers += `<rect x="${ix-IR}" y="${iy+bDn-IR*0.4}" width="${IR*2}" height="${IR*0.8}" fill="#424242" stroke="#333" stroke-width="0.8" rx="${IR*0.4}"/>`;
+  }
+
+  // ── TAIL PULLEY + ASSEMBLY ──
+  const tailPulley = `
+    <circle cx="${ox}" cy="${oy}" r="${TP_R}" fill="#37474f" stroke="#1a1a1a" stroke-width="2.5"/>
+    <circle cx="${ox}" cy="${oy}" r="${TP_R*0.55}" fill="#455a64" stroke="none"/>
+    <circle cx="${ox}" cy="${oy}" r="${TP_R*0.12}" fill="#78909c"/>
+    ${lockBush(ox, oy, TP_R)}
+    <line x1="${ox-TP_R}" y1="${oy}" x2="${ox-TP_R*1.8}" y2="${oy}" stroke="#90a4ae" stroke-width="${Math.max(4,TP_R*0.18)}"/>
+    <line x1="${ox+TP_R}" y1="${oy}" x2="${ox+TP_R*1.8}" y2="${oy}" stroke="#90a4ae" stroke-width="${Math.max(4,TP_R*0.18)}"/>
+    ${plummerBlock(ox-TP_R*1.45,oy,TP_R*0.75,TP_R*1.2,s)}
+    ${plummerBlock(ox+TP_R*1.45,oy,TP_R*0.75,TP_R*1.2,s)}
+    ${solePlate(ox-TP_R*1.45,oy+TP_R*0.62,TP_R,TP_R*0.14)}
+    ${solePlate(ox+TP_R*1.45,oy+TP_R*0.62,TP_R,TP_R*0.14)}`;
+
+  // ── HEAD PULLEY + DRIVE ASSEMBLY ──
+  const gbW = Math.max(50,HP_R*1.7), gbH = Math.max(40,HP_R*1.3);
+  const fcD = gbH*0.8, mW = Math.max(58,HP_R*2.2), mH = Math.max(42,HP_R*1.4);
+  const drX = hx + HP_R*1.8;
+  const rcX = drX, gbX = rcX + 15*s, fcX = gbX + gbW + 10*s, mX = fcX + fcD/2 + 9*s;
+
+  const headPulley = `
+    <circle cx="${hx}" cy="${hy}" r="${HP_R}" fill="#1a237e" stroke="#0d1b5e" stroke-width="2.5"/>
+    <circle cx="${hx}" cy="${hy}" r="${HP_R*0.55}" fill="#283593" stroke="none"/>
+    <circle cx="${hx}" cy="${hy}" r="${HP_R*0.12}" fill="#5c6bc0"/>
+    ${lockBush(hx, hy, HP_R)}
+    <line x1="${hx-HP_R}" y1="${hy}" x2="${hx-HP_R*1.8}" y2="${hy}" stroke="#90a4ae" stroke-width="${Math.max(4,HP_R*0.18)}"/>
+    <line x1="${hx+HP_R}" y1="${hy}" x2="${drX+mW+14*s}" y2="${hy}" stroke="#90a4ae" stroke-width="${Math.max(5,HP_R*0.2)}"/>
+    ${plummerBlock(hx-HP_R*1.45,hy,HP_R*0.82,HP_R*1.35,s)}
+    ${plummerBlock(hx+HP_R*1.45,hy,HP_R*0.82,HP_R*1.35,s)}
+    ${solePlate(hx-HP_R*1.45,hy+HP_R*0.69,HP_R*1.1,HP_R*0.14)}
+    ${solePlate(hx+HP_R*1.45,hy+HP_R*0.69,HP_R*1.1,HP_R*0.14)}
+    <!-- Rigid coupling -->
+    <rect x="${rcX}" y="${hy-8*s}" width="${14*s}" height="${16*s}" fill="#546e7a" stroke="#37474f" stroke-width="1.5" rx="2"/>
+    <line x1="${rcX+5*s}" y1="${hy-8*s}" x2="${rcX+5*s}" y2="${hy+8*s}" stroke="#90a4ae" stroke-width="0.8"/>
+    <line x1="${rcX+9*s}" y1="${hy-8*s}" x2="${rcX+9*s}" y2="${hy+8*s}" stroke="#90a4ae" stroke-width="0.8"/>
+    <!-- Gearbox -->
+    <rect x="${gbX}" y="${hy-gbH/2}" width="${gbW}" height="${gbH}" fill="#7b1fa2" stroke="#4a148c" stroke-width="2" rx="3"/>
+    <rect x="${gbX}" y="${hy-gbH/2}" width="${gbW}" height="${gbH*0.14}" fill="#9c27b0" rx="3"/>
+    <rect x="${gbX+5*s}" y="${hy+gbH/2}" width="${gbW-10*s}" height="${6*s}" fill="#6a1b9a" rx="1"/>
+    <circle cx="${gbX+gbW*0.72}" cy="${hy+gbH*0.18}" r="${5*s}" fill="#80deea" stroke="#4a148c" opacity="0.7"/>
+    <text x="${gbX+gbW/2}" y="${hy+4*s}" text-anchor="middle" font-size="${Math.max(7,9*s)}" fill="white" font-weight="bold" font-family="Arial">GEARBOX</text>
+    <!-- Fluid coupling -->
+    <ellipse cx="${fcX}" cy="${hy}" rx="${fcD/2}" ry="${fcD*0.44}" fill="#0277bd" stroke="#01579b" stroke-width="2"/>
+    <ellipse cx="${fcX}" cy="${hy}" rx="${fcD*0.28}" ry="${fcD*0.27}" fill="#0288d1" stroke="#01579b" stroke-width="1"/>
+    <ellipse cx="${fcX}" cy="${hy}" rx="${fcD*0.09}" ry="${fcD*0.08}" fill="#4fc3f7"/>
+    <text x="${fcX}" y="${hy+fcD*0.56}" text-anchor="middle" font-size="${Math.max(6,7.5*s)}" fill="#01579b" font-weight="bold" font-family="Arial">F.COUP.</text>
+    <!-- Motor (green like reference) -->
+    <rect x="${mX}" y="${hy-mH/2}" width="${mW}" height="${mH}" fill="#2e7d32" stroke="#1b5e20" stroke-width="2" rx="4"/>
+    ${Array.from({length:7},(_,i)=>`<line x1="${mX+mW*0.13+i*mW*0.11}" y1="${hy-mH/2}" x2="${mX+mW*0.13+i*mW*0.11}" y2="${hy+mH/2}" stroke="#1b5e20" stroke-width="1.5"/>`).join('')}
+    <rect x="${mX+mW*0.18}" y="${hy-mH/2-mH*0.24}" width="${mW*0.3}" height="${mH*0.26}" fill="#388e3c" stroke="#1b5e20" stroke-width="1.2" rx="2"/>
+    <text x="${mX+mW*0.5}" y="${hy+3*s}" text-anchor="middle" font-size="${Math.max(7,9*s)}" fill="white" font-weight="bold" font-family="Arial">${b.motor_kw}kW</text>
+    <rect x="${mX}" y="${hy+mH/2}" width="${mW}" height="${5*s}" fill="#1b5e20" rx="1"/>`;
+
+  // Snub pulley (below head end)
+  const snubX = hx - SP_R*1.4*cA, snubY = hy + HP_R*0.5 + SP_R*1.5;
+  const snubPulley = `
+    <circle cx="${snubX}" cy="${snubY}" r="${SP_R}" fill="#455a64" stroke="#263238" stroke-width="1.5"/>
+    <circle cx="${snubX}" cy="${snubY}" r="${SP_R*0.4}" fill="#546e7a"/>`;
+
+  // Take-up assembly
   let takeup = '';
-  const tkH = Math.max(12, 18 * scale);
-  const tkX = ox - 20*scale;
-  const tkY = oy + beltOff + 5*scale;
   if (b.take_up_type === 'gravity') {
+    const tkR = SP_R * 0.85;
+    const tkX = hx - SP_R * 3.2, tkY = snubY + tkR * 2.8;
+    const wW = tkR*1.8, wH = tkR*4.5;
     takeup = `
-      <rect x="${tkX-6*scale}" y="${tkY}" width="${12*scale}" height="${tkH}" fill="#aaa" stroke="#555" stroke-width="1" rx="2"/>
-      <circle cx="${tkX}" cy="${tkY + tkH + 6*scale}" r="${Math.max(3,5*scale)}" fill="#666"/>
-      <line x1="${tkX}" y1="${tkY+tkH}" x2="${tkX}" y2="${tkY+tkH+14*scale}" stroke="#555" stroke-width="1"/>
-    `;
+      <circle cx="${tkX}" cy="${tkY}" r="${tkR}" fill="#455a64" stroke="#263238" stroke-width="1.5"/>
+      <circle cx="${tkX}" cy="${tkY}" r="${tkR*0.4}" fill="#546e7a"/>
+      <line x1="${tkX-wW*0.6}" y1="${snubY+SP_R}" x2="${tkX-wW*0.6}" y2="${tkY+wH}" stroke="#1565c0" stroke-width="${3*s}"/>
+      <line x1="${tkX+wW*0.6}" y1="${snubY+SP_R}" x2="${tkX+wW*0.6}" y2="${tkY+wH}" stroke="#1565c0" stroke-width="${3*s}"/>
+      <rect x="${tkX-wW/2}" y="${tkY+tkR+4*s}" width="${wW}" height="${wH}" fill="#37474f" stroke="#263238" stroke-width="2" rx="2"/>
+      <text x="${tkX}" y="${tkY+tkR+wH*0.55}" text-anchor="middle" font-size="${Math.max(6,7.5*s)}" fill="#b0bec5" font-weight="bold" font-family="Arial">T/U</text>
+      <text x="${tkX}" y="${tkY+tkR+wH*0.75}" text-anchor="middle" font-size="${Math.max(5.5,7*s)}" fill="#b0bec5" font-family="Arial">WEIGHT</text>`;
   } else {
-    // screw take-up
+    const sX = ox + TP_R*1.8 + 10*s, sY = oy + TP_R + 14*s;
     takeup = `
-      <rect x="${tkX-3*scale}" y="${tkY - tkH*0.3}" width="${6*scale}" height="${tkH*1.3}" fill="#aaa" stroke="#555" stroke-width="1" rx="1"/>
-      <line x1="${tkX}" y1="${tkY-tkH*0.3}" x2="${tkX}" y2="${tkY-tkH*0.3-8*scale}" stroke="#555" stroke-width="1.5"/>
-    `;
+      <rect x="${sX}" y="${sY-8*s}" width="${38*s}" height="${16*s}" fill="#546e7a" stroke="#37474f" stroke-width="1.5" rx="3"/>
+      <text x="${sX+19*s}" y="${sY-12*s}" text-anchor="middle" font-size="${Math.max(6,7*s)}" fill="#455a64" font-family="Arial">SCREW T/U</text>`;
   }
 
-  // skirt board near tail
-  const skirtLen = b.skirt_length_m * PX_M * scale;
-  const skirtPts = [
-    [ox, oy - beltOff],
-    [ox + dX*skirtLen/L, oy - dY*skirtLen/L - beltOff],
+  // Feed hopper (matches reference - trapezoid shape)
+  const hopW = Math.max(60, BW*0.9), hopH = Math.max(70, BW*1.1);
+  const hopX = ox - hopW/2 - 10*s, hopY = oy - TP_R - hopH;
+  const hopper = `
+    <polygon points="${hopX},${hopY} ${hopX+hopW*1.6},${hopY} ${hopX+hopW*1.1},${hopY+hopH} ${hopX+hopW*0.2},${hopY+hopH}" fill="#546e7a" stroke="#37474f" stroke-width="2"/>
+    <polygon points="${hopX+4},${hopY+5} ${hopX+hopW*1.6-4},${hopY+5} ${hopX+hopW*1.1-3},${hopY+hopH-4} ${hopX+hopW*0.2+3},${hopY+hopH-4}" fill="#455a64" opacity="0.5"/>
+    <text x="${hopX+hopW*0.85}" y="${hopY+hopH*0.5}" text-anchor="middle" font-size="${Math.max(7,9*s)}" fill="#b0bec5" font-weight="bold" font-family="Arial">FEED</text>
+    <text x="${hopX+hopW*0.85}" y="${hopY+hopH*0.68}" text-anchor="middle" font-size="${Math.max(7,9*s)}" fill="#b0bec5" font-weight="bold" font-family="Arial">HOPPER</text>`;
+
+  // Discharge chute at head
+  const dcW = BW*0.25, dcH = BW*0.55;
+  const dischChute = `
+    <polygon points="${hx-dcW*0.2},${hy+HP_R} ${hx+dcW*1.6},${hy+HP_R} ${hx+dcW*2},${hy+HP_R+dcH} ${hx-dcW*0.2},${hy+HP_R+dcH}" fill="#546e7a" stroke="#37474f" stroke-width="1.8"/>
+    <polygon points="${hx-dcW*0.2+3},${hy+HP_R+3} ${hx+dcW*1.6-3},${hy+HP_R+3} ${hx+dcW*2-2},${hy+HP_R+dcH-3} ${hx-dcW*0.2+2},${hy+HP_R+dcH-3}" fill="#37474f" opacity="0.5"/>`;
+
+  // Primary scraper
+  const scrA = ang + 25*Math.PI/180;
+  const sTX = hx - HP_R*Math.cos(scrA+Math.PI/2), sTY = hy + HP_R*Math.sin(scrA+Math.PI/2);
+  const scraper = `
+    <line x1="${sTX}" y1="${sTY}" x2="${sTX-16*s}" y2="${sTY+20*s}" stroke="#c62828" stroke-width="${Math.max(4,5*s)}" stroke-linecap="round"/>
+    <circle cx="${sTX}" cy="${sTY}" r="${4*s}" fill="#ff5252"/>`;
+
+  // V-plough
+  const vpX = ox+dX*0.18, vpY = oy-dY*0.18+bDn+2*s;
+  const vplough = `<polygon points="${vpX},${vpY} ${vpX-BW*0.28},${vpY+BW*0.07} ${vpX+BW*0.28},${vpY+BW*0.07}" fill="#c62828" stroke="#8b0000" stroke-width="1.5"/>`;
+
+  // Load skirts
+  const skirts = `<line x1="${ox}" y1="${oy-TP_R}" x2="${ox+dX*0.2}" y2="${oy-dY*0.2-bUp*0.5}" stroke="#c62828" stroke-width="${Math.max(3,4*s)}" stroke-linecap="round"/>`;
+
+  // Head pulley guard
+  const guard = `
+    <path d="M${hx-HP_R*1.1},${hy-HP_R*1.1} A${HP_R*1.15},${HP_R*1.15} 0 0,1 ${hx+HP_R*1.1},${hy-HP_R*1.1}" fill="none" stroke="#ffd600" stroke-width="${2.5*s}" stroke-dasharray="8,4"/>
+    <text x="${hx}" y="${hy-HP_R*1.3}" text-anchor="middle" font-size="${Math.max(6,7*s)}" fill="#fdd835" font-family="Arial">GUARD</text>`;
+
+  // Walkway
+  const wY = oy - bUp - FH - 18*s;
+  const walkway = `
+    <line x1="${ox+TP_R*1.5*cA}" y1="${wY-dY*0}" x2="${hx-HP_R*1.5*cA}" y2="${wY-dY}" stroke="#1e88e5" stroke-width="${3.5*s}" stroke-dasharray="14,6" opacity="0.8"/>
+    <text x="${(ox+hx)/2}" y="${(wY+wY-dY)/2-8*s}" text-anchor="middle" font-size="${Math.max(6,7.5*s)}" fill="#1e88e5" font-family="Arial">WALKWAY + HANDRAIL</text>`;
+
+  // ── RED DIMENSION LINES (matching reference style) ──
+  const dimOff = legH + 32*s;
+  let dims = '';
+  // C/C length
+  dims += dimRed(ox, oy+dimOff, hx, hy+dimOff, `${Math.round(b.length_m*1000)} mm`, 0, 9*s);
+  // Rise (if inclined)
+  if (b.incline_deg > 0.5) {
+    dims += dimRed(hx+45*s, oy, hx+45*s, hy, `${Math.round(b.rise_m*1000)} mm`, 0, 8*s);
+  }
+  // Head height
+  const headGroundY = hy + legH + dY*0.5;
+  dims += dimRed(W-40*s, headGroundY, W-40*s, hy-HP_R, `${headH_mm} mm`, 0, 8*s);
+  // Tail height
+  const tailGroundY = oy + legH;
+  dims += dimRed(padL*0.35, tailGroundY, padL*0.35, oy-TP_R, `${tailH_mm} mm`, 0, 8*s);
+  // Inclination angle arc
+  if (b.incline_deg > 0.5) {
+    const arcR = 55*s;
+    dims += `<path d="M${ox+arcR},${oy} A${arcR},${arcR} 0 0,1 ${ox+arcR*cA},${oy-arcR*sA}" fill="none" stroke="#e53935" stroke-width="1.5" stroke-dasharray="4,3"/>
+      <text x="${ox+arcR+12*s}" y="${oy-10*s}" font-size="${Math.max(9,11*s)}" fill="#e53935" font-weight="bold" font-family="Arial">${b.incline_deg}°</text>`;
+  }
+  // Belt width
+  dims += dimRed(ox-TP_R*1.8-20*s, oy-BW/2, ox-TP_R*1.8-20*s, oy+BW/2, `${b.width_mm} mm`, 0, 8*s);
+
+  // ── NUMBERED CALLOUTS (matching reference style) ──
+  let calls = '';
+  const calloutList = [
+    [1,  hx, hy, hx+HP_R+40*s, hy-HP_R-35*s, 'DRIVE PULLEY (Head)'],
+    [2,  ox, oy, ox-TP_R-40*s, oy-TP_R-35*s, 'GEAR MOTOR + GEARBOX'],
+    [3,  mX+mW/2, hy-mH/2, mX+mW/2, hy-mH/2-35*s, 'MOTOR'],
+    [4,  fcX, hy, fcX, hy-fcD-30*s, 'COUPLING (Fluid)'],
+    [5,  hx+HP_R*1.5, hy, hx+HP_R*1.5, hy-HP_R*1.8, 'SUPPORT FRAME (Head)'],
+    [6,  mX+mW*0.5, hy+mH/2+5*s, mX+mW*0.5, hy+mH/2+35*s, 'MOTOR BASE'],
+    [7,  ox+dX*0.5, oy-dY*0.5-bUp, ox+dX*0.5, oy-dY*0.5-bUp-38*s, 'CONVEYOR BELT'],
+    [8,  ox, oy, ox-TP_R-40*s, oy+30*s, 'TAIL PULLEY'],
+    [9,  (b.take_up_type==='gravity'?hx-SP_R*3.2:ox+TP_R*2),(b.take_up_type==='gravity'?snubY+SP_R*2.5:oy+TP_R+20*s), (b.take_up_type==='gravity'?hx-SP_R*3.2-50*s:ox-20*s), (b.take_up_type==='gravity'?snubY+SP_R*4.5:oy+TP_R+55*s), 'TAKE-UP PULLEY'],
+    [10, ox+dX*0.42, oy-dY*0.42-bUp, ox+dX*0.42, oy-dY*0.42-bUp-38*s, 'UPPER ROLLER SET'],
+    [11, ox+dX*0.35, oy-dY*0.35-bUp-FH*0.5, ox+dX*0.35-45*s, oy-dY*0.35-bUp-FH*0.5-30*s, 'UPPER TROUGHING IDLER FRAME'],
+    [12, ox+dX*0.6, oy-dY*0.6+bDn, ox+dX*0.6, oy-dY*0.6+bDn+35*s, 'LOWER RETURN ROLLER SET'],
+    [13, ox+dX*0.5, oy-dY*0.5+bDn+FH, ox+dX*0.5+40*s, oy-dY*0.5+bDn+FH+30*s, 'LOWER RETURN IDLER FRAME'],
+    [14, hopX+hopW*0.85, hopY+hopH*0.5, hopX+hopW*0.85-50*s, hopY-20*s, 'FEED HOPPER'],
+    [15, sTX, sTY+12*s, sTX+45*s, sTY+40*s, 'BELT SCRAPER / CLEANER'],
+    [16, ox+dX*0.3, oy-dY*0.3+legH*0.6, ox+dX*0.3+40*s, oy-dY*0.3+legH*0.6+30*s, 'SUPPORT LEGS'],
+    [17, hx, hy-HP_R*1.15, hx-40*s, hy-HP_R*1.8, 'HEAD PULLEY GUARD'],
   ];
-
-  // dimension lines
-  function dimLine(x1,y1,x2,y2,label,offset) {
-    const mx=(x1+x2)/2, my=(y1+y2)/2;
-    return `
-      <line x1="${x1}" y1="${y1+offset}" x2="${x2}" y2="${y2+offset}" stroke="#e67e22" stroke-width="1" stroke-dasharray="4,2" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
-      <text x="${mx}" y="${my+offset-5}" text-anchor="middle" font-size="${Math.max(8,10*scale)}" fill="#d35400" font-weight="bold">${label}</text>`;
+  for (const [num, ax, ay, bx, by, label] of calloutList) {
+    calls += calloutRef(ax, ay, bx, by, num);
+    const right = bx > ax;
+    calls += `<text x="${right ? bx+14 : bx-14}" y="${by+1}" text-anchor="${right?'start':'end'}" dominant-baseline="middle" font-size="${Math.max(6.5,8*s)}" fill="#1a3a5c" font-family="Arial">${label}</text>`;
   }
 
-  // support legs (every ~5m, 2 min)
-  let legs = '';
-  const legSpacing = PX_M * scale * 5;
-  const n_legs = Math.max(2, Math.floor(L / legSpacing));
-  for (let i = 0; i <= n_legs; i++) {
-    const t = i / n_legs;
-    const lx = ox + dX * t;
-    const ly = oy - dY * t;
-    const legH = Math.max(8, 12 * scale) + dY * t;
-    legs += `<line x1="${lx}" y1="${ly+beltOff+2}" x2="${lx}" y2="${ly+legH}" stroke="#666" stroke-width="${Math.max(1.5,2*scale)}"/>`;
-    legs += `<line x1="${lx-8*scale}" y1="${ly+legH}" x2="${lx+8*scale}" y2="${ly+legH}" stroke="#444" stroke-width="${Math.max(2,3*scale)}"/>`;
-  }
+  // ── TITLE ──
+  const titleH = 36*s;
+  const titleBlock = `
+    <rect x="0" y="0" width="${W}" height="${titleH}" fill="#0d1b2a"/>
+    <text x="${W/2}" y="${titleH*0.65}" text-anchor="middle" font-size="${Math.max(10,14*s)}" fill="white" font-weight="bold" font-family="Arial">BELT CONVEYOR — SIDE ELEVATION VIEW</text>`;
 
-  // drive assembly at head
-  const motorW = Math.max(18, 24 * scale);
-  const motorH = Math.max(10, 14 * scale);
-  const driveX = hx + 10*scale;
-  const driveY = hy - motorH/2;
-
-  // discharge chute
-  const dcW = Math.max(8, 12*scale);
-
-  // title block
-  const titleY = H - 28*scale;
-
-  const svg = `
-<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" style="font-family:Arial,sans-serif">
-  <defs>
-    <marker id="arrow" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
-      <path d="M0,0 L6,3 L0,6 Z" fill="#e67e22"/>
-    </marker>
-    <pattern id="hatch" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
-      <line x1="0" y1="0" x2="0" y2="6" stroke="#bbb" stroke-width="1"/>
-    </pattern>
-  </defs>
-
-  <!-- BACKGROUND GRID -->
-  <rect width="${W}" height="${H}" fill="#fafbfc"/>
-
-  <!-- TITLE BLOCK -->
-  <rect x="0" y="${H-32*scale}" width="${W}" height="${32*scale}" fill="#1e3a5f" rx="0"/>
-  <text x="10" y="${H-16*scale}" fill="white" font-size="${Math.max(8,10*scale)}" font-weight="bold">${b.tag} — SIDE ELEVATION</text>
-  <text x="10" y="${H-5*scale}" fill="#a8c4e0" font-size="${Math.max(7,9*scale)}">${b.purpose.replace(/_/g,' ').toUpperCase()} | W:${b.width_mm}mm | L:${b.length_m}m | θ:${b.incline_deg}° | ${b.hp}HP</text>
-  <text x="${W-10}" y="${H-16*scale}" fill="#a8c4e0" font-size="${Math.max(7,9*scale)}" text-anchor="end">PROMAN MACHINERY PVT LTD</text>
-  <text x="${W-10}" y="${H-5*scale}" fill="#a8c4e0" font-size="${Math.max(6,8*scale)}" text-anchor="end">DRG NO: ${b.tag}-E-001 | REV: 00</text>
-
-  <!-- SUPPORT LEGS -->
-  ${legs}
-
-  <!-- TRUSS / FRAME DIAGONALS -->
-  ${truss}
-
-  <!-- CENTRE LINE (chassis) -->
-  <line x1="${ox}" y1="${oy}" x2="${hx}" y2="${hy}" stroke="#2c3e50" stroke-width="${Math.max(3,4*scale)}" stroke-linecap="round"/>
-
-  <!-- LOWER CHORD (frame bottom) -->
-  <line x1="${ox}" y1="${oy+8*scale}" x2="${hx}" y2="${hy+8*scale}" stroke="#2c3e50" stroke-width="${Math.max(1.5,2*scale)}"/>
-
-  <!-- RETURN BELT -->
-  <line x1="${retBx1}" y1="${retBy1}" x2="${retBx2}" y2="${retBy2}" stroke="#c8a000" stroke-width="${Math.max(1.5,2*scale)}" stroke-dasharray="8,4"/>
-
-  <!-- CARRYING BELT -->
-  <line x1="${topBx1}" y1="${topBy1}" x2="${topBx2}" y2="${topBy2}" stroke="#c8a000" stroke-width="${Math.max(2,3*scale)}"/>
-
-  <!-- CARRYING IDLERS -->
-  ${carrying_idlers}
-
-  <!-- RETURN IDLERS -->
-  ${return_idlers}
-
-  <!-- TAIL PULLEY -->
-  <circle cx="${ox}" cy="${oy}" r="${tp/2}" fill="#6c7a8e" stroke="#34495e" stroke-width="${Math.max(1.5,2*scale)}"/>
-  <circle cx="${ox}" cy="${oy}" r="${tp/4}" fill="#95a5a6"/>
-  <text x="${ox}" y="${oy+tp/2+12*scale}" text-anchor="middle" font-size="${Math.max(7,9*scale)}" fill="#555">TAIL Ø${b.tail_pulley_dia_mm}</text>
-
-  <!-- HEAD PULLEY -->
-  <circle cx="${hx}" cy="${hy}" r="${hp/2}" fill="#2c3e50" stroke="#1a252f" stroke-width="${Math.max(1.5,2*scale)}"/>
-  <circle cx="${hx}" cy="${hy}" r="${hp/4}" fill="#566573"/>
-  <text x="${hx}" y="${hy-hp/2-5*scale}" text-anchor="middle" font-size="${Math.max(7,9*scale)}" fill="#555">HEAD Ø${b.head_pulley_dia_mm}</text>
-
-  <!-- SNUB PULLEY near head -->
-  <circle cx="${hx-sp*1.2}" cy="${hy+sp*0.8}" r="${sp/2}" fill="#8e9eab" stroke="#5d6d7e" stroke-width="${Math.max(1,1.5*scale)}"/>
-  <text x="${hx-sp*1.2}" y="${hy+sp*0.8+sp/2+10*scale}" text-anchor="middle" font-size="${Math.max(6,8*scale)}" fill="#777">SNUB Ø${b.snub_pulley_dia_mm}</text>
-
-  <!-- TAKE-UP -->
-  ${takeup}
-
-  <!-- SKIRT BOARD -->
-  <line x1="${skirtPts[0][0]}" y1="${skirtPts[0][1]-beltOff*0.5}" x2="${skirtPts[1][0]}" y2="${skirtPts[1][1]-beltOff*0.5}" stroke="#c0392b" stroke-width="${Math.max(2,3*scale)}" opacity="0.7"/>
-  <text x="${ox+skirtLen/2}" y="${oy-beltOff*1.5-5*scale}" text-anchor="middle" font-size="${Math.max(6,8*scale)}" fill="#c0392b">SKIRT ${b.skirt_length_m}m</text>
-
-  <!-- DRIVE MOTOR BOX -->
-  <rect x="${driveX}" y="${driveY}" width="${motorW}" height="${motorH}" fill="#e67e22" stroke="#d35400" stroke-width="1" rx="2"/>
-  <text x="${driveX+motorW/2}" y="${driveY+motorH/2+3}" text-anchor="middle" font-size="${Math.max(6,7.5*scale)}" fill="white" font-weight="bold">MOTOR</text>
-  <text x="${driveX+motorW/2}" y="${driveY-4*scale}" text-anchor="middle" font-size="${Math.max(6,7.5*scale)}" fill="#d35400">${b.motor_kw}kW/${b.hp}HP</text>
-
-  <!-- DISCHARGE CHUTE -->
-  <polygon points="${hx},${hy+hp/2} ${hx+dcW},${hy+hp/2} ${hx+dcW*0.6},${hy+hp/2+dcW*2} ${hx-dcW*0.2},${hy+hp/2+dcW*2}" fill="#7f8c8d" stroke="#5d6d7e" stroke-width="1" opacity="0.8"/>
-  <text x="${hx+dcW*0.5}" y="${hy+hp/2+dcW*2+10*scale}" text-anchor="middle" font-size="${Math.max(6,8*scale)}" fill="#555">DISCH. CHUTE</text>
-
-  <!-- FEED CHUTE -->
-  <polygon points="${ox-dcW*0.2},${oy-tp/2} ${ox+dcW},${oy-tp/2} ${ox+dcW*0.8},${oy-tp/2-dcW*2} ${ox-dcW*0.6},${oy-tp/2-dcW*2}" fill="#7f8c8d" stroke="#5d6d7e" stroke-width="1" opacity="0.8"/>
-  <text x="${ox}" y="${oy-tp/2-dcW*2-5*scale}" text-anchor="middle" font-size="${Math.max(6,8*scale)}" fill="#555">FEED CHUTE</text>
-
-  <!-- DIMENSION: C-C LENGTH -->
-  <line x1="${ox}" y1="${oy+32*scale}" x2="${hx}" y2="${hy+32*scale}" stroke="#e67e22" stroke-width="1" stroke-dasharray="4,2"/>
-  <text x="${(ox+hx)/2}" y="${(oy+hy)/2+40*scale}" text-anchor="middle" font-size="${Math.max(7,9*scale)}" fill="#d35400" font-weight="bold">C/C = ${b.length_m} m</text>
-  <line x1="${ox}" y1="${oy+25*scale}" x2="${ox}" y2="${oy+38*scale}" stroke="#e67e22" stroke-width="1"/>
-  <line x1="${hx}" y1="${hy+25*scale}" x2="${hx}" y2="${hy+38*scale}" stroke="#e67e22" stroke-width="1"/>
-
-  <!-- RISE DIMENSION (if inclined) -->
-  ${b.incline_deg > 1 ? `
-  <line x1="${hx+20*scale}" y1="${oy}" x2="${hx+20*scale}" y2="${hy}" stroke="#2980b9" stroke-width="1" stroke-dasharray="4,2"/>
-  <text x="${hx+28*scale}" y="${(oy+hy)/2}" text-anchor="start" font-size="${Math.max(7,9*scale)}" fill="#2980b9" font-weight="bold">H=${b.rise_m}m</text>
-  <line x1="${hx+15*scale}" y1="${hy}" x2="${hx+25*scale}" y2="${hy}" stroke="#2980b9" stroke-width="1"/>
-  <line x1="${hx+15*scale}" y1="${oy}" x2="${hx+25*scale}" y2="${oy}" stroke="#2980b9" stroke-width="1"/>
-  ` : ''}
-
-  <!-- INCLINATION ANGLE ARC -->
-  ${b.incline_deg > 1 ? `
-  <path d="M${ox+30*scale},${oy} A${30*scale},${30*scale} 0 0,0 ${ox+30*scale*Math.cos(ang)},${oy-30*scale*Math.sin(ang)}" fill="none" stroke="#2980b9" stroke-width="1.5" stroke-dasharray="3,2"/>
-  <text x="${ox+36*scale}" y="${oy-8*scale}" font-size="${Math.max(7,10*scale)}" fill="#2980b9" font-weight="bold">${b.incline_deg}°</text>
-  ` : ''}
-
-  <!-- BORDER -->
-  <rect x="2" y="2" width="${W-4}" height="${H-4}" fill="none" stroke="#1e3a5f" stroke-width="2" rx="3"/>
-</svg>`;
-  return svg;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H+titleH}" style="font-family:Arial,sans-serif;background:#f8f9fa">
+    ${svgDefsNew()}
+    ${titleBlock}
+    <g transform="translate(0,${titleH})">
+      ${Array.from({length:20},(_,i)=>`<line x1="${i*W/20}" y1="0" x2="${i*W/20}" y2="${H}" stroke="#eeeeee" stroke-width="0.5"/>`).join('')}
+      ${legs}${frame}${belt}${idlers}
+      ${tailPulley}${headPulley}${snubPulley}${takeup}
+      ${hopper}${dischChute}${scraper}${vplough}${skirts}${guard}${walkway}
+      ${dims}${calls}
+    </g>
+    <rect x="3" y="3" width="${W-6}" height="${H+titleH-6}" fill="none" stroke="#0d1b2a" stroke-width="2.5" rx="2"/>
+  </svg>`;
 }
 
-// PLAN VIEW (top)
+// ─────────────────────────────────────────────────────────────────────────────
+// PLAN VIEW  —  matches reference top view style
+// ─────────────────────────────────────────────────────────────────────────────
 function buildPlanSVG(b, scale) {
-  const L  = b.length_m * PX_M * scale;
-  const W  = L + 120 * scale;
-  const bw = mm2px(b.width_mm, scale);
-  const H  = bw * 3 + 120 * scale;
-  const ox = 50 * scale;
-  const oy = H / 2;
-  const hp = mm2px(b.head_pulley_dia_mm, scale);
-  const tp = mm2px(b.tail_pulley_dia_mm, scale);
-  const ci_pitch = Math.max(1, b.carrying_idler_pitch_mm || 1200) / 1000 * PX_M * scale;
-  const frameW = bw + 20 * scale;
+  const s = scale;
+  const TARGET_L = Math.max(1400, Math.min(2800, b.length_m * 85));
+  const PM = TARGET_L / b.length_m * s;
+  const L   = b.length_m * PM;
+  const BW  = b.width_mm / 1000 * PM;
+  const FW  = (b.width_mm + 400) / 1000 * PM;
+  const HP_R = Math.max(18, b.head_pulley_dia_mm/1000*PM/2);
+  const TP_R = Math.max(18, b.tail_pulley_dia_mm/1000*PM/2);
+  const ci_px = Math.max(1, b.carrying_idler_pitch_mm||1200)/1000*PM;
+  const n_ci  = Math.min(80, Math.floor(L/ci_px));
+  const IR    = Math.max(5, BW * 0.06);
+  const pad   = 80*s;
+  const hopW  = Math.max(100, BW*1.5), hopH_plan = Math.max(80, BW*1.2);
+  const hopHalf = Math.max(40, BW*0.35);
+  const titleH = 36*s, tbH = 28*s;
+  const W = L + pad*2 + HP_R*2 + FW + hopW + 20*s;
+  const H = FW + pad*1.2 + titleH + tbH;
+  const ox = pad + TP_R + hopW + 10*s;
+  const cy_  = (H - titleH - tbH)/2 + titleH;
 
-  let idler_lines = '';
-  let n_ci = Math.min(200, Math.floor(L / ci_pitch));
-  for (let i = 0; i <= n_ci; i++) {
-    const t = i / n_ci;
-    const x = ox + L * t;
-    idler_lines += `<line x1="${x}" y1="${oy - bw/2 - 5*scale}" x2="${x}" y2="${oy + bw/2 + 5*scale}" stroke="#555" stroke-width="${Math.max(1,1.5*scale)}"/>`;
+  let idlerLines = '';
+  for (let i=0; i<=n_ci; i++) {
+    const x = ox + L*i/n_ci;
+    idlerLines += `<line x1="${x}" y1="${cy_-FW/2-6*s}" x2="${x}" y2="${cy_+FW/2+6*s}" stroke="#1a1a1a" stroke-width="${Math.max(1.5,IR*0.3)}"/>`;
   }
-  // impact idlers (red, near tail)
-  for (let i = 0; i < 3; i++) {
-    const x = ox + ci_pitch * (i + 0.5);
-    idler_lines += `<line x1="${x}" y1="${oy - bw/2 - 5*scale}" x2="${x}" y2="${oy + bw/2 + 5*scale}" stroke="#c0392b" stroke-width="${Math.max(1.5,2*scale)}"/>`;
+  for (let i=1; i<=3; i++) {
+    const x = ox + (150/1000*PM)*i;
+    idlerLines += `<line x1="${x}" y1="${cy_-FW/2-6*s}" x2="${x}" y2="${cy_+FW/2+6*s}" stroke="#c62828" stroke-width="${Math.max(2,IR*0.4)}"/>`;
+  }
+  const ri_px = Math.max(1, b.return_idler_pitch_mm||3000)/1000*PM;
+  const n_ri  = Math.min(30, Math.floor(L/ri_px));
+  for (let i=1; i<n_ri; i++) {
+    const x = ox + L*i/n_ri;
+    idlerLines += `<line x1="${x}" y1="${cy_-BW*0.06}" x2="${x}" y2="${cy_+BW*0.06}" stroke="#546e7a" stroke-width="${Math.max(1,IR*0.25)}" stroke-dasharray="3,2"/>`;
   }
 
-  const svg = `
-<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" style="font-family:Arial,sans-serif">
-  <rect width="${W}" height="${H}" fill="#fafbfc"/>
+  const plan = `
+    <!-- FRAME OUTLINE (blue) -->
+    <rect x="${ox-TP_R}" y="${cy_-FW/2}" width="${L+TP_R+HP_R}" height="${FW}" fill="#e3f2fd" stroke="#1565c0" stroke-width="2.5" rx="4"/>
+    <!-- BELT (dark strip) -->
+    <rect x="${ox-TP_R}" y="${cy_-BW/2}" width="${L+TP_R+HP_R}" height="${BW}" fill="#212121" stroke="#333" stroke-width="1.5" rx="2" opacity="0.85"/>
+    <!-- CENTRELINE -->
+    <line x1="${ox-TP_R*1.2}" y1="${cy_}" x2="${ox+L+HP_R*1.2}" y2="${cy_}" stroke="#e53935" stroke-width="1" stroke-dasharray="14,6"/>
+    <text x="${ox+L*0.5}" y="${cy_-BW/2-12*s}" text-anchor="middle" font-size="${Math.max(6.5,8*s)}" fill="#e53935" font-family="Arial">CENTRE LINE</text>
+    ${idlerLines}
+    <!-- TAIL PULLEY (plan ellipse) -->
+    <ellipse cx="${ox}" cy="${cy_}" rx="${TP_R*0.12}" ry="${TP_R}" fill="#37474f" stroke="#1a1a1a" stroke-width="1.5"/>
+    <!-- HEAD PULLEY (plan ellipse) -->
+    <ellipse cx="${ox+L}" cy="${cy_}" rx="${HP_R*0.12}" ry="${HP_R}" fill="#1a237e" stroke="#0d1b5e" stroke-width="1.5"/>
+    <!-- MOTOR + GEARBOX (top view) -->
+    <rect x="${ox+L+HP_R+6*s}" y="${cy_-FW*0.25}" width="${FW*0.42}" height="${FW*0.5}" fill="#2e7d32" stroke="#1b5e20" stroke-width="1.5" rx="3"/>
+    <text x="${ox+L+HP_R+6*s+FW*0.21}" y="${cy_+3}" text-anchor="middle" font-size="${Math.max(6,7.5*s)}" fill="white" font-weight="bold" font-family="Arial">DRIVE</text>
+    <!-- FEED HOPPER (plan) -->
+    <rect x="${ox-hopW-8*s}" y="${cy_-hopH_plan/2}" width="${hopW}" height="${hopH_plan}" fill="#546e7a" stroke="#37474f" stroke-width="2" rx="3"/>
+    <rect x="${ox-hopW-8*s+hopW*0.15}" y="${cy_-hopHalf/2}" width="${hopW*0.7}" height="${hopHalf}" fill="#37474f" rx="2"/>
+    <text x="${ox-hopW/2-8*s}" y="${cy_+3}" text-anchor="middle" font-size="${Math.max(7,9*s)}" fill="#b0bec5" font-weight="bold" font-family="Arial">HOPPER</text>
+    <!-- SKIRT BOARDS -->
+    <rect x="${ox}" y="${cy_-FW/2}" width="${b.skirt_length_m*PM}" height="${(FW-BW)/2}" fill="#c62828" opacity="0.4"/>
+    <rect x="${ox}" y="${cy_+BW/2}" width="${b.skirt_length_m*PM}" height="${(FW-BW)/2}" fill="#c62828" opacity="0.4"/>
+    <!-- DIMENSIONS -->
+    ${dimRed(ox, cy_+FW/2+24*s, ox+L, cy_+FW/2+24*s, `${Math.round(b.length_m*1000)} mm`, 0, 9*s)}
+    ${dimRed(ox+L+HP_R+FW*0.42+16*s, cy_-BW/2, ox+L+HP_R+FW*0.42+16*s, cy_+BW/2, `${b.width_mm} mm`, 0, 8*s)}
+    ${dimRed(ox+L+HP_R+FW*0.42+30*s, cy_-FW/2, ox+L+HP_R+FW*0.42+30*s, cy_+FW/2, `${Math.round((b.width_mm+400))} mm`, 0, 8*s)}
+    <!-- CALLOUTS -->
+    ${calloutRef(ox, cy_, ox-TP_R-40*s, cy_-50*s, 8)}<text x="${ox-TP_R-53*s}" y="${cy_-50*s}" text-anchor="end" dominant-baseline="middle" font-size="${Math.max(6.5,8*s)}" fill="#1a3a5c" font-family="Arial">TAIL PULLEY</text>
+    ${calloutRef(ox+L, cy_, ox+L+HP_R+50*s, cy_-45*s, 1)}<text x="${ox+L+HP_R+63*s}" y="${cy_-45*s}" dominant-baseline="middle" font-size="${Math.max(6.5,8*s)}" fill="#1a3a5c" font-family="Arial">HEAD PULLEY</text>
+    ${calloutRef(ox+L*0.5, cy_-BW/2-IR, ox+L*0.5, cy_-FW/2-30*s, 10)}<text x="${ox+L*0.5}" y="${cy_-FW/2-43*s}" text-anchor="middle" font-size="${Math.max(6.5,8*s)}" fill="#1a3a5c" font-family="Arial">UPPER ROLLER SET</text>
+    ${calloutRef(ox-hopW/2-8*s, cy_, ox-hopW-30*s, cy_-60*s, 14)}<text x="${ox-hopW-43*s}" y="${cy_-60*s}" text-anchor="end" dominant-baseline="middle" font-size="${Math.max(6.5,8*s)}" fill="#1a3a5c" font-family="Arial">FEED HOPPER</text>`;
 
-  <!-- FRAME OUTLINE -->
-  <rect x="${ox-tp/2}" y="${oy-frameW/2}" width="${L+hp/2+tp/2}" height="${frameW}" fill="#eef" stroke="#2c3e50" stroke-width="${Math.max(1.5,2*scale)}" rx="4"/>
-
-  <!-- BELT OUTLINE -->
-  <rect x="${ox-tp/2}" y="${oy-bw/2}" width="${L+hp/2+tp/2}" height="${bw}" fill="#f5d76e" stroke="#c8a000" stroke-width="${Math.max(1.5,2*scale)}" rx="3"/>
-
-  <!-- CENTRE LINE -->
-  <line x1="${ox-tp*0.7}" y1="${oy}" x2="${ox+L+hp*0.7}" y2="${oy}" stroke="#e67e22" stroke-width="1" stroke-dasharray="10,5"/>
-  <text x="${ox+L/2}" y="${oy-5}" text-anchor="middle" font-size="${Math.max(7,8*scale)}" fill="#d35400">CL</text>
-
-  <!-- CARRYING IDLERS -->
-  ${idler_lines}
-
-  <!-- TAIL PULLEY -->
-  <ellipse cx="${ox}" cy="${oy}" rx="${tp/6}" ry="${tp/2}" fill="#6c7a8e" stroke="#34495e" stroke-width="${Math.max(1.5,2*scale)}"/>
-  <text x="${ox}" y="${oy+tp/2+12*scale}" text-anchor="middle" font-size="${Math.max(7,9*scale)}" fill="#555">TAIL</text>
-
-  <!-- HEAD PULLEY -->
-  <ellipse cx="${ox+L}" cy="${oy}" rx="${hp/6}" ry="${hp/2}" fill="#2c3e50" stroke="#1a252f" stroke-width="${Math.max(1.5,2*scale)}"/>
-  <text x="${ox+L}" y="${oy+hp/2+12*scale}" text-anchor="middle" font-size="${Math.max(7,9*scale)}" fill="#555">HEAD</text>
-
-  <!-- MOTOR (top-right) -->
-  <rect x="${ox+L+15*scale}" y="${oy-12*scale}" width="${24*scale}" height="${24*scale}" fill="#e67e22" stroke="#d35400" stroke-width="1" rx="3"/>
-  <text x="${ox+L+27*scale}" y="${oy+3}" text-anchor="middle" font-size="${Math.max(6,7*scale)}" fill="white" font-weight="bold">MTR</text>
-
-  <!-- SKIRT -->
-  <rect x="${ox}" y="${oy-bw/2-4*scale}" width="${b.skirt_length_m*PX_M*scale}" height="${8*scale}" fill="#c0392b" opacity="0.5"/>
-  <rect x="${ox}" y="${oy+bw/2-4*scale}" width="${b.skirt_length_m*PX_M*scale}" height="${8*scale}" fill="#c0392b" opacity="0.5"/>
-  <text x="${ox+b.skirt_length_m*PX_M*scale/2}" y="${oy-bw/2-8*scale}" text-anchor="middle" font-size="${Math.max(6,7*scale)}" fill="#c0392b">SKIRT BOARD ${b.skirt_length_m}m</text>
-
-  <!-- DIMENSION -->
-  <line x1="${ox}" y1="${H-40*scale}" x2="${ox+L}" y2="${H-40*scale}" stroke="#e67e22" stroke-width="1" stroke-dasharray="4,2"/>
-  <text x="${ox+L/2}" y="${H-44*scale}" text-anchor="middle" font-size="${Math.max(7,9*scale)}" fill="#d35400" font-weight="bold">C/C = ${b.length_m} m</text>
-  <line x1="${ox}" y1="${H-46*scale}" x2="${ox}" y2="${H-34*scale}" stroke="#e67e22" stroke-width="1"/>
-  <line x1="${ox+L}" y1="${H-46*scale}" x2="${ox+L}" y2="${H-34*scale}" stroke="#e67e22" stroke-width="1"/>
-
-  <!-- WIDTH DIM -->
-  <line x1="${ox-tp/2-20*scale}" y1="${oy-bw/2}" x2="${ox-tp/2-20*scale}" y2="${oy+bw/2}" stroke="#2980b9" stroke-width="1" stroke-dasharray="4,2"/>
-  <text x="${ox-tp/2-26*scale}" y="${oy+4}" text-anchor="end" font-size="${Math.max(7,9*scale)}" fill="#2980b9" font-weight="bold">${b.width_mm}mm</text>
-
-  <!-- VIEW LABEL -->
-  <text x="${W/2}" y="${H-8*scale}" text-anchor="middle" font-size="${Math.max(8,10*scale)}" fill="white" font-weight="bold">PLAN VIEW (TOP)</text>
-
-  <!-- TITLE BLOCK -->
-  <rect x="0" y="${H-28*scale}" width="${W}" height="${28*scale}" fill="#1e3a5f" rx="0"/>
-  <text x="10" y="${H-14*scale}" fill="white" font-size="${Math.max(8,10*scale)}" font-weight="bold">${b.tag} — PLAN VIEW</text>
-  <text x="10" y="${H-4*scale}" fill="#a8c4e0" font-size="${Math.max(6,8*scale)}">${b.purpose.replace(/_/g,' ').toUpperCase()} | W:${b.width_mm}mm | L:${b.length_m}m | ${b.hp}HP</text>
-  <text x="${W-10}" y="${H-4*scale}" fill="#a8c4e0" font-size="${Math.max(6,8*scale)}" text-anchor="end">PROMAN MACHINERY — DRG NO: ${b.tag}-P-001</text>
-  <rect x="2" y="2" width="${W-4}" height="${H-4}" fill="none" stroke="#1e3a5f" stroke-width="2" rx="3"/>
-</svg>`;
-  return svg;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" style="font-family:Arial,sans-serif;background:#f8f9fa">
+    ${svgDefsNew()}
+    <rect x="0" y="0" width="${W}" height="${titleH}" fill="#0d1b2a"/>
+    <text x="${W/2}" y="${titleH*0.65}" text-anchor="middle" font-size="${Math.max(10,13*s)}" fill="white" font-weight="bold" font-family="Arial">TOP VIEW (PLAN)</text>
+    ${plan}
+    <rect x="0" y="${H-tbH}" width="${W}" height="${tbH}" fill="#1565c0"/>
+    <text x="14" y="${H-tbH+18*s}" fill="white" font-size="${Math.max(6.5,8.5*s)}" font-weight="bold" font-family="Arial">${b.tag} — PLAN VIEW | W:${b.width_mm}mm × L:${b.length_m}m | PROMAN MACHINERY | DRG: ${b.tag}-P-001 REV00</text>
+    <rect x="3" y="3" width="${W-6}" height="${H-6}" fill="none" stroke="#0d1b2a" stroke-width="2" rx="2"/>
+  </svg>`;
 }
 
-// CROSS-SECTION (A-A) — troughed idler view
+// ─────────────────────────────────────────────────────────────────────────────
+// CROSS-SECTION  —  detailed troughed idler section
+// ─────────────────────────────────────────────────────────────────────────────
 function buildCrossSectionSVG(b, scale) {
-  const bw  = mm2px(b.width_mm, scale);
-  const ang = b.troughing_angle_deg * Math.PI / 180;
-  const S   = 200 * scale;  // half svg size
-  const W   = S * 2 + 60 * scale;
-  const H   = S * 1.6 + 80 * scale;
-  const cx  = W / 2;
-  const cy  = H / 2 - 10 * scale;
+  const s = scale;
+  const BW   = b.width_mm / 1000 * 260 * s;
+  const ang  = b.troughing_angle_deg * Math.PI / 180;
+  const IR   = Math.max(9, BW * 0.055);
+  const wingL = BW * 0.39;
+  const ctrL  = BW * 0.23;
+  const W = BW * 2.6, H = BW * 2.0 + 100*s;
+  const cx = W / 2, cy = H * 0.5;
 
-  // Idler geometry: 3 rolls, centre + 2 wing rolls
-  const wing_len = bw * 0.42;
-  const ctr_len  = bw * 0.25;
-  const idler_r  = Math.max(6, 9 * scale);
-  const pitch    = Math.max(8, 12 * scale);
+  const wx = Math.cos(ang)*wingL, wy = Math.sin(ang)*wingL;
+  const lw1 = {x: cx-ctrL/2, y: cy}, lw2 = {x: cx-ctrL/2-wx, y: cy+wy};
+  const rw1 = {x: cx+ctrL/2, y: cy}, rw2 = {x: cx+ctrL/2+wx, y: cy+wy};
+  const beltT = Math.max(2, BW*0.022);
+  const bPath = `M${lw2.x-IR-beltT},${lw2.y+beltT} L${lw2.x},${lw2.y} L${lw1.x},${lw1.y} L${rw1.x},${rw1.y} L${rw2.x},${rw2.y} L${rw2.x+IR+beltT},${rw2.y+beltT}`;
+  const matH = BW * 0.22;
+  const matPath = `M${lw2.x+10*s},${lw2.y-5*s} L${lw1.x-6*s},${lw1.y-matH*0.5} L${cx},${cy-matH} L${rw1.x+6*s},${rw1.y-matH*0.5} L${rw2.x-10*s},${rw2.y-5*s}`;
+  const frameY = cy + wy + IR + 12*s, frameBotY = frameY + 28*s;
+  const fL = lw2.x - wingL*0.3 - 14*s, fR = rw2.x + wingL*0.3 + 14*s;
 
-  // Wing roll endpoints
-  const wl_x1 = cx - ctr_len/2 - wing_len * Math.cos(ang);
-  const wl_y1 = cy + wing_len * Math.sin(ang);
-  const wl_x2 = cx - ctr_len/2;
-  const wl_y2 = cy;
-  const wr_x1 = cx + ctr_len/2;
-  const wr_y1 = cy;
-  const wr_x2 = cx + ctr_len/2 + wing_len * Math.cos(ang);
-  const wr_y2 = cy + wing_len * Math.sin(ang);
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" style="font-family:Arial,sans-serif;background:#f8f9fa">
+    ${svgDefsNew()}
+    <rect x="0" y="0" width="${W}" height="${30*s}" fill="#0d1b2a"/>
+    <text x="${W/2}" y="${20*s}" text-anchor="middle" font-size="${Math.max(9,12*s)}" fill="white" font-weight="bold" font-family="Arial">SECTION A-A — TROUGHED IDLER CROSS-SECTION</text>
+    <text x="${W/2}" y="${43*s}" text-anchor="middle" font-size="${Math.max(7,9*s)}" fill="#455a64" font-family="Arial">${b.tag} | Belt Width: ${b.width_mm}mm | Troughing Angle: ${b.troughing_angle_deg}°</text>
 
-  // Belt path (follows idler contour)
-  const beltPath = `M${wl_x1-idler_r},${wl_y1+5} L${wl_x1},${wl_y1} L${wl_x2},${wl_y2} L${wr_x1},${wr_y1} L${wr_x2},${wr_y2} L${wr_x2+idler_r},${wr_y2+5}`;
-  const material_path = `M${wl_x1+2},${wl_y1} L${wl_x2},${wl_y2-2} L${wr_x1},${wr_y1-2} L${wr_x2-2},${wr_y2} Z`;
+    <!-- FRAME (blue) -->
+    <line x1="${fL}" y1="${frameY-4*s}" x2="${fL}" y2="${frameBotY}" stroke="#1565c0" stroke-width="${Math.max(3,5*s)}"/>
+    <line x1="${fR}" y1="${frameY-4*s}" x2="${fR}" y2="${frameBotY}" stroke="#1565c0" stroke-width="${Math.max(3,5*s)}"/>
+    <line x1="${fL}" y1="${frameBotY}" x2="${fR}" y2="${frameBotY}" stroke="#1565c0" stroke-width="${Math.max(2,3.5*s)}"/>
+    <line x1="${fL+5*s}" y1="${frameY+8*s}" x2="${fR-5*s}" y2="${frameY+8*s}" stroke="#1e88e5" stroke-width="${Math.max(1.5,2.5*s)}" stroke-dasharray="5,4"/>
+    <!-- BRACKETS -->
+    <line x1="${lw2.x-4*s}" y1="${lw2.y+IR+2*s}" x2="${fL+10*s}" y2="${frameY}" stroke="#1e88e5" stroke-width="${Math.max(1.5,2.5*s)}"/>
+    <line x1="${rw2.x+4*s}" y1="${rw2.y+IR+2*s}" x2="${fR-10*s}" y2="${frameY}" stroke="#1e88e5" stroke-width="${Math.max(1.5,2.5*s)}"/>
+    <!-- SKEGA PAD (rubber strip on frame arms) -->
+    <line x1="${lw1.x}" y1="${lw1.y+IR}" x2="${lw1.x-3*s}" y2="${lw1.y+IR+6*s}" stroke="#c62828" stroke-width="${3*s}"/>
+    <line x1="${rw1.x}" y1="${rw1.y+IR}" x2="${rw1.x+3*s}" y2="${rw1.y+IR+6*s}" stroke="#c62828" stroke-width="${3*s}"/>
+    <!-- CENTRE ROLL -->
+    <g transform="translate(${cx},${cy})">
+      <rect x="${-ctrL/2}" y="${-IR}" width="${ctrL}" height="${IR*2}" fill="#1a1a1a" stroke="#333" stroke-width="${Math.max(1.5,2.5*s)}" rx="${IR}"/>
+      <line x1="${-ctrL/2}" y1="0" x2="${ctrL/2}" y2="0" stroke="#666" stroke-width="0.8"/>
+    </g>
+    <!-- LEFT WING ROLL -->
+    <g transform="translate(${lw1.x},${lw1.y}) rotate(${-b.troughing_angle_deg})">
+      <rect x="${-wingL}" y="${-IR}" width="${wingL}" height="${IR*2}" fill="#212121" stroke="#333" stroke-width="${Math.max(1.5,2.5*s)}" rx="${IR}"/>
+      <line x1="${-wingL}" y1="0" x2="0" y2="0" stroke="#666" stroke-width="0.8"/>
+    </g>
+    <!-- RIGHT WING ROLL -->
+    <g transform="translate(${rw1.x},${rw1.y}) rotate(${b.troughing_angle_deg})">
+      <rect x="0" y="${-IR}" width="${wingL}" height="${IR*2}" fill="#212121" stroke="#333" stroke-width="${Math.max(1.5,2.5*s)}" rx="${IR}"/>
+      <line x1="0" y1="0" x2="${wingL}" y2="0" stroke="#666" stroke-width="0.8"/>
+    </g>
+    <!-- MATERIAL -->
+    <path d="${matPath}" fill="url(#xhatch)" stroke="#888" stroke-width="0.5" opacity="0.7"/>
+    <!-- BELT -->
+    <path d="${bPath}" fill="none" stroke="#111" stroke-width="${Math.max(beltT,3)}" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- LOAD SKIRT BOARDS -->
+    <line x1="${cx-BW*0.08}" y1="${cy-matH-18*s}" x2="${lw1.x-4*s}" y2="${lw1.y+3*s}" stroke="#c62828" stroke-width="${Math.max(2.5,4*s)}"/>
+    <line x1="${cx+BW*0.08}" y1="${cy-matH-18*s}" x2="${rw1.x+4*s}" y2="${rw1.y+3*s}" stroke="#c62828" stroke-width="${Math.max(2.5,4*s)}"/>
 
-  // Frame cross members
-  const frameY = cy + wing_len * Math.sin(ang) + 20 * scale;
+    <!-- DIMENSIONS (red) -->
+    ${dimRed(lw2.x-IR, lw2.y+22*s, rw2.x+IR, rw2.y+22*s, `Belt Width = ${b.width_mm} mm`, 0, 9*s)}
+    ${dimRed(cx-ctrL/2, cy-IR-18*s, cx+ctrL/2, cy-IR-18*s, `${Math.round(b.width_mm*0.23)}mm`, 0, 7*s)}
+    ${dimRed(lw1.x-wingL, lw1.y-IR-14*s, lw1.x, lw1.y-IR-14*s, `${Math.round(b.width_mm*0.39)}mm`, 0, 7*s)}
+    <path d="M${cx-ctrL/2},${cy} A${32*s},${32*s} 0 0,0 ${cx-ctrL/2-32*s*Math.cos(ang)},${cy+32*s*Math.sin(ang)}" fill="none" stroke="#e53935" stroke-width="1.5" stroke-dasharray="3,2"/>
+    <text x="${cx-ctrL/2-42*s}" y="${cy+15*s}" text-anchor="end" font-size="${Math.max(8,10*s)}" fill="#e53935" font-weight="bold" font-family="Arial">${b.troughing_angle_deg}°</text>
 
-  const svg = `
-<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" style="font-family:Arial,sans-serif">
-  <rect width="${W}" height="${H}" fill="#fafbfc"/>
+    <!-- CALLOUT LABELS -->
+    ${calloutRef(cx,cy,cx+BW*0.45+18*s,cy-8*s,10)}<text x="${cx+BW*0.45+31*s}" y="${cy-5*s}" font-size="${Math.max(6.5,8*s)}" fill="#1a3a5c" font-family="Arial">Centre Roll (Flat)</text>
+    ${calloutRef(lw2.x,lw2.y,lw2.x-BW*0.3,lw2.y+22*s,11)}<text x="${lw2.x-BW*0.3-14*s}" y="${lw2.y+25*s}" text-anchor="end" font-size="${Math.max(6.5,8*s)}" fill="#1a3a5c" font-family="Arial">Wing Roll (L)</text>
+    ${calloutRef(rw2.x,rw2.y,rw2.x+BW*0.3,rw2.y+22*s,11)}<text x="${rw2.x+BW*0.3+14*s}" y="${rw2.y+25*s}" font-size="${Math.max(6.5,8*s)}" fill="#1a3a5c" font-family="Arial">Wing Roll (R)</text>
+    ${calloutRef(cx,cy-matH*0.6,cx+BW*0.3,cy-matH-30*s,12)}<text x="${cx+BW*0.3+14*s}" y="${cy-matH-27*s}" font-size="${Math.max(6.5,8*s)}" fill="#1a3a5c" font-family="Arial">Material Load</text>
+    ${calloutRef(lw2.x+5*s,lw2.y+beltT,lw2.x-BW*0.28,lw2.y+52*s,7)}<text x="${lw2.x-BW*0.28-14*s}" y="${lw2.y+55*s}" text-anchor="end" font-size="${Math.max(6.5,8*s)}" fill="#1a3a5c" font-family="Arial">Belt EP${Math.round(b.width_mm/100)*100+400}/4</text>
+    ${calloutRef(lw1.x-4*s,lw1.y+IR+4*s,fL-16*s,frameY+18*s,13)}<text x="${fL-30*s}" y="${frameY+21*s}" text-anchor="end" font-size="${Math.max(6.5,8*s)}" fill="#1a3a5c" font-family="Arial">Idler Frame (Blue frame)</text>
+    ${calloutRef(cx-BW*0.06,cy-matH-10*s,cx-BW*0.35,cy-matH-36*s,16)}<text x="${cx-BW*0.35-14*s}" y="${cy-matH-33*s}" text-anchor="end" font-size="${Math.max(6.5,8*s)}" fill="#1a3a5c" font-family="Arial">Load Skirt + Skega Pad</text>
 
-  <!-- CROSS SECTION LABEL -->
-  <text x="${W/2}" y="${20*scale}" text-anchor="middle" font-size="${Math.max(9,12*scale)}" fill="#1e3a5f" font-weight="bold">SECTION A-A  (Troughed Idler Cross-Section)</text>
-
-  <!-- FRAME SIDE PLATES -->
-  <line x1="${wl_x1-idler_r-10*scale}" y1="${frameY-5*scale}" x2="${wl_x1-idler_r-10*scale}" y2="${frameY+20*scale}" stroke="#2c3e50" stroke-width="${Math.max(3,4*scale)}"/>
-  <line x1="${wr_x2+idler_r+10*scale}" y1="${frameY-5*scale}" x2="${wr_x2+idler_r+10*scale}" y2="${frameY+20*scale}" stroke="#2c3e50" stroke-width="${Math.max(3,4*scale)}"/>
-  <!-- BOTTOM CROSS MEMBER -->
-  <line x1="${wl_x1-idler_r-10*scale}" y1="${frameY+20*scale}" x2="${wr_x2+idler_r+10*scale}" y2="${frameY+20*scale}" stroke="#2c3e50" stroke-width="${Math.max(2,3*scale)}"/>
-  <!-- IDLER SUPPORT BRACKETS -->
-  <line x1="${wl_x1}" y1="${wl_y1+idler_r}" x2="${wl_x1-5*scale}" y2="${frameY-5*scale}" stroke="#4a5568" stroke-width="${Math.max(1.5,2*scale)}"/>
-  <line x1="${wr_x2}" y1="${wr_y2+idler_r}" x2="${wr_x2+5*scale}" y2="${frameY-5*scale}" stroke="#4a5568" stroke-width="${Math.max(1.5,2*scale)}"/>
-
-  <!-- CENTRE IDLER ROLL -->
-  <rect x="${cx-ctr_len/2}" y="${cy-idler_r}" width="${ctr_len}" height="${idler_r*2}" fill="#6c7a8e" stroke="#34495e" stroke-width="${Math.max(1.5,2*scale)}" rx="${idler_r}"/>
-
-  <!-- LEFT WING ROLL -->
-  <g transform="translate(${wl_x2},${wl_y2}) rotate(${-b.troughing_angle_deg})">
-    <rect x="${-wing_len}" y="${-idler_r}" width="${wing_len}" height="${idler_r*2}" fill="#8e9eab" stroke="#5d6d7e" stroke-width="${Math.max(1.5,2*scale)}" rx="${idler_r}"/>
-  </g>
-
-  <!-- RIGHT WING ROLL -->
-  <g transform="translate(${wr_x1},${wr_y1}) rotate(${b.troughing_angle_deg})">
-    <rect x="0" y="${-idler_r}" width="${wing_len}" height="${idler_r*2}" fill="#8e9eab" stroke="#5d6d7e" stroke-width="${Math.max(1.5,2*scale)}" rx="${idler_r}"/>
-  </g>
-
-  <!-- MATERIAL LOAD (cross-hatched) -->
-  <path d="${material_path}" fill="url(#xhatch)" stroke="none" opacity="0.6"/>
-
-  <!-- BELT -->
-  <path d="${beltPath}" fill="none" stroke="#c8a000" stroke-width="${Math.max(3,4*scale)}" stroke-linecap="round" stroke-linejoin="round"/>
-
-  <!-- LOAD SKIRT BOARDS -->
-  <line x1="${cx-ctr_len/2-5*scale}" y1="${cy-20*scale}" x2="${wl_x2-5*scale}" y2="${wl_y2}" stroke="#c0392b" stroke-width="${Math.max(2,3*scale)}"/>
-  <line x1="${cx+ctr_len/2+5*scale}" y1="${cy-20*scale}" x2="${wr_x1+5*scale}" y2="${wr_y1}" stroke="#c0392b" stroke-width="${Math.max(2,3*scale)}"/>
-  <text x="${cx}" y="${cy-26*scale}" text-anchor="middle" font-size="${Math.max(7,8*scale)}" fill="#c0392b">LOAD SKIRTS</text>
-
-  <!-- ANNOTATIONS -->
-  <text x="${wl_x1-5*scale}" y="${wl_y1+idler_r+14*scale}" font-size="${Math.max(7,8*scale)}" fill="#4a5568" text-anchor="end">WING ROLL</text>
-  <text x="${wr_x2+5*scale}" y="${wr_y2+idler_r+14*scale}" font-size="${Math.max(7,8*scale)}" fill="#4a5568">WING ROLL</text>
-  <text x="${cx}" y="${cy+idler_r+14*scale}" text-anchor="middle" font-size="${Math.max(7,8*scale)}" fill="#4a5568">CENTRE ROLL</text>
-  <text x="${cx}" y="${cy-idler_r-12*scale}" text-anchor="middle" font-size="${Math.max(7,8*scale)}" fill="#c8a000" font-weight="bold">BELT</text>
-
-  <!-- TROUGH ANGLE ARC -->
-  <path d="M${cx-ctr_len/2},${cy} A${20*scale},${20*scale} 0 0,0 ${cx-ctr_len/2-18*scale*Math.cos(ang)},${cy+18*scale*Math.sin(ang)}" fill="none" stroke="#2980b9" stroke-width="1.5"/>
-  <text x="${cx-ctr_len/2-22*scale}" y="${cy+10*scale}" text-anchor="end" font-size="${Math.max(7,9*scale)}" fill="#2980b9" font-weight="bold">${b.troughing_angle_deg}°</text>
-
-  <!-- BELT WIDTH DIMENSION -->
-  <line x1="${wl_x1-idler_r}" y1="${cy-40*scale}" x2="${wr_x2+idler_r}" y2="${cy-40*scale}" stroke="#2980b9" stroke-width="1" stroke-dasharray="4,2"/>
-  <text x="${cx}" y="${cy-43*scale}" text-anchor="middle" font-size="${Math.max(7,9*scale)}" fill="#2980b9" font-weight="bold">BELT WIDTH = ${b.width_mm} mm</text>
-  <line x1="${wl_x1-idler_r}" y1="${cy-45*scale}" x2="${wl_x1-idler_r}" y2="${cy-35*scale}" stroke="#2980b9" stroke-width="1"/>
-  <line x1="${wr_x2+idler_r}" y1="${cy-45*scale}" x2="${wr_x2+idler_r}" y2="${cy-35*scale}" stroke="#2980b9" stroke-width="1"/>
-
-  <!-- TITLE BLOCK -->
-  <defs>
-    <pattern id="xhatch" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
-      <line x1="0" y1="0" x2="0" y2="8" stroke="#888" stroke-width="1"/>
-      <line x1="0" y1="0" x2="8" y2="0" stroke="#888" stroke-width="1"/>
-    </pattern>
-  </defs>
-  <rect x="0" y="${H-28*scale}" width="${W}" height="${28*scale}" fill="#1e3a5f"/>
-  <text x="10" y="${H-14*scale}" fill="white" font-size="${Math.max(8,10*scale)}" font-weight="bold">${b.tag} — SECTION A-A (CROSS SECTION)</text>
-  <text x="10" y="${H-4*scale}" fill="#a8c4e0" font-size="${Math.max(6,8*scale)}">BELT WIDTH: ${b.width_mm}mm | TROUGHING ANGLE: ${b.troughing_angle_deg}° | PROMAN MACHINERY</text>
-  <rect x="2" y="2" width="${W-4}" height="${H-4}" fill="none" stroke="#1e3a5f" stroke-width="2" rx="3"/>
-</svg>`;
-  return svg;
+    <rect x="3" y="3" width="${W-6}" height="${H-6}" fill="none" stroke="#0d1b2a" stroke-width="2" rx="2"/>
+  </svg>`;
 }
 
-// ALL VIEWS (combined sheet)
-function buildAllViewsSVG(b, scale) {
-  // Composite: elevation top, plan mid-left, cross-section mid-right
-  const elSVG   = buildElevationSVG(b, scale * 0.75);
-  const planSVG = buildPlanSVG(b, scale * 0.7);
-  const crossSVG = buildCrossSectionSVG(b, scale * 0.65);
+// ─────────────────────────────────────────────────────────────────────────────
+// ISOMETRIC 3D  — kept compact, blue frame
+// ─────────────────────────────────────────────────────────────────────────────
+function buildIsometricSVG(b, scale) {
+  const s = scale * 0.85;
+  const PM = Math.min(50, Math.max(25, 900/b.length_m)) * s;
+  const Lh = b.horiz_m * PM, Lr = b.rise_m * PM;
+  const FW = (b.width_mm + 400) / 1000 * PM;
+  const FH = Math.max(10, (b.width_mm/1000*PM) * 0.14);
+  const HP = Math.max(5, b.head_pulley_dia_mm/1000*PM*0.45);
+  const TP = Math.max(5, b.tail_pulley_dia_mm/1000*PM*0.45);
+  const ox = FW*0.866 + 40*s, oy = Lr + FH + FW*0.5 + 90*s;
+  const pt = (wx,wy,wz) => { const p=iso(wx,wy,wz,1,ox,oy); return `${p.x},${p.y}`; };
+  const pP = pts => pts.map(([a,b2,c])=>pt(a,b2,c)).join(' ');
+  const allP = [[0,0,0],[0,FW,0],[0,0,FH],[0,FW,FH],[Lh,0,Lr],[Lh,FW,Lr],[Lh,0,Lr+FH],[Lh,FW,Lr+FH]].map(([a,b2,c])=>iso(a,b2,c,1,ox,oy));
+  const svgW = Math.max(...allP.map(p=>p.x)) + 160*s;
+  const svgH = Math.max(...allP.map(p=>p.y)) + 80*s;
+  const titleH = 32*s;
 
-  // Extract viewport sizes by parsing viewBox / width
-  function extractDims(svgStr) {
-    const wm = svgStr.match(/width="([^"]+)"/);
-    const hm = svgStr.match(/height="([^"]+)"/);
-    return { w: parseFloat(wm?.[1]||0), h: parseFloat(hm?.[1]||0) };
+  // legs
+  let legs3 = '';
+  const n = Math.max(2,Math.floor(Lh/(PM*5)));
+  for (let i=0;i<=n;i++) {
+    const t=i/n, lx=Lh*t, lz=Lr*t, gz=-(lz+20*s);
+    const pN=iso(lx,0,lz,1,ox,oy), pF=iso(lx,FW,lz,1,ox,oy), pBN=iso(lx,0,gz,1,ox,oy), pBF=iso(lx,FW,gz,1,ox,oy);
+    legs3+=`<line x1="${pN.x}" y1="${pN.y}" x2="${pBN.x}" y2="${pBN.y}" stroke="#1565c0" stroke-width="${2.5*s}"/>
+      <line x1="${pF.x}" y1="${pF.y}" x2="${pBF.x}" y2="${pBF.y}" stroke="#1565c0" stroke-width="${2.5*s}"/>
+      <line x1="${pBN.x}" y1="${pBN.y}" x2="${pBF.x}" y2="${pBF.y}" stroke="#0d47a1" stroke-width="${3*s}"/>`;
   }
-  const ed = extractDims(elSVG);
-  const pd = extractDims(planSVG);
-  const cd = extractDims(crossSVG);
+  // Idlers
+  let id3='';
+  const ni=Math.min(10,Math.floor(Lh/(PM*4)));
+  for(let i=1;i<ni;i++){
+    const t=i/ni,lx=Lh*t,lz=Lr*t;
+    const p1=iso(lx,FW*0.08,lz+FH,1,ox,oy),p2=iso(lx,FW*0.92,lz+FH,1,ox,oy);
+    id3+=`<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke="#111" stroke-width="${2*s}"/>
+      <circle cx="${p1.x}" cy="${p1.y}" r="${3*s}" fill="#1a1a1a"/>
+      <circle cx="${p2.x}" cy="${p2.y}" r="${3*s}" fill="#1a1a1a"/>`;
+  }
+  const b1=iso(0,FW*0.18,FH+2*s,1,ox,oy),b2=iso(Lh,FW*0.18,Lr+FH+2*s,1,ox,oy);
+  const b3=iso(Lh,FW*0.82,Lr+FH+2*s,1,ox,oy),b4=iso(0,FW*0.82,FH+2*s,1,ox,oy);
+  const hC=iso(Lh,FW/2,Lr+FH/2,1,ox,oy),tC=iso(0,FW/2,FH/2,1,ox,oy);
+  const mH3=iso(Lh+HP*0.6,FW*0.3,Lr+FH*2.2,1,ox,oy);
+  const tPt=iso(0,0,0,1,ox,oy), hPt=iso(Lh,0,Lr,1,ox,oy);
 
-  const bottomW = pd.w + cd.w + 20;
-  const totalW  = Math.max(ed.w, bottomW) + 20;
-  const totalH  = ed.h + Math.max(pd.h, cd.h) + 60;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${svgW}" height="${svgH+titleH}" style="font-family:Arial,sans-serif;background:#f8f9fa">
+    ${svgDefsNew()}
+    <rect x="0" y="0" width="${svgW}" height="${titleH}" fill="#0d1b2a"/>
+    <text x="${svgW/2}" y="${titleH*0.65}" text-anchor="middle" font-size="${Math.max(9,12*s)}" fill="white" font-weight="bold" font-family="Arial">ISOMETRIC 3D VIEW — ${b.tag}</text>
+    <line x1="0" y1="${svgH+titleH-10*s}" x2="${svgW}" y2="${svgH+titleH-10*s}" stroke="#ccc" stroke-width="1" stroke-dasharray="6,4"/>
+    ${legs3}
+    <polygon points="${pP([[0,FW,0],[Lh,FW,Lr],[Lh,FW,Lr+FH],[0,FW,FH]])}" fill="#bbdefb" stroke="#1565c0" stroke-width="${1.5*s}" opacity="0.9"/>
+    <polygon points="${pP([[0,0,0],[Lh,0,Lr],[Lh,0,Lr+FH],[0,0,FH]])}" fill="#e3f2fd" stroke="#1565c0" stroke-width="${1.8*s}" opacity="0.9"/>
+    <polygon points="${pP([[0,0,0],[0,FW,0],[Lh,FW,Lr],[Lh,0,Lr]])}" fill="#b3c5d8" stroke="#1565c0" stroke-width="${1.2*s}" opacity="0.8"/>
+    <polygon points="${pP([[0,0,FH],[0,FW,FH],[0,FW,0],[0,0,0]])}" fill="#c5d8e8" stroke="#1565c0" stroke-width="${1.2*s}"/>
+    <polygon points="${pP([[Lh,0,Lr+FH],[Lh,FW,Lr+FH],[Lh,FW,Lr],[Lh,0,Lr]])}" fill="#c0d4e4" stroke="#1565c0" stroke-width="${1.2*s}"/>
+    <polygon points="${pP([[0,0,FH],[0,FW,FH],[Lh,FW,Lr+FH],[Lh,0,Lr+FH]])}" fill="#ddeeff" stroke="#1565c0" stroke-width="${2*s}" opacity="0.95"/>
+    <polygon points="${b1.x},${b1.y} ${b2.x},${b2.y} ${b3.x},${b3.y} ${b4.x},${b4.y}" fill="#111" stroke="#333" stroke-width="1" opacity="0.85"/>
+    ${id3}
+    <ellipse cx="${hC.x}" cy="${hC.y}" rx="${Math.max(6,HP)}" ry="${Math.max(8,HP*1.3)}" fill="#1a237e" stroke="#0d1b5e" stroke-width="1.5"/>
+    <ellipse cx="${tC.x}" cy="${tC.y}" rx="${Math.max(5,TP)}" ry="${Math.max(7,TP*1.3)}" fill="#37474f" stroke="#1a1a1a" stroke-width="1.5"/>
+    <circle cx="${mH3.x}" cy="${mH3.y}" r="${Math.max(10,14*s)}" fill="#2e7d32" stroke="#1b5e20" stroke-width="1.5"/>
+    <text x="${mH3.x}" y="${mH3.y+4}" text-anchor="middle" font-size="${Math.max(6,8*s)}" fill="white" font-weight="bold" font-family="Arial">MTR</text>
+    <text x="${(tPt.x+hPt.x)/2}" y="${svgH+titleH-18*s}" text-anchor="middle" font-size="${Math.max(7,9*s)}" fill="#e53935" font-weight="bold" font-family="Arial">C/C = ${b.length_m} m</text>
+    <line x1="${tPt.x}" y1="${svgH+titleH-22*s}" x2="${hPt.x}" y2="${svgH+titleH-22*s}" stroke="#e53935" stroke-width="1" marker-start="url(#arr-red)" marker-end="url(#arr-red-r)"/>
+    <text x="${hC.x+18*s}" y="${hC.y}" font-size="${Math.max(6.5,8*s)}" fill="#1a3a5c" font-family="Arial">HEAD END</text>
+    <text x="${tC.x-18*s}" y="${tC.y}" text-anchor="end" font-size="${Math.max(6.5,8*s)}" fill="#1a3a5c" font-family="Arial">TAIL END</text>
+    <rect x="3" y="3" width="${svgW-6}" height="${svgH+titleH-6}" fill="none" stroke="#0d1b2a" stroke-width="2" rx="2"/>
+  </svg>`;
+}
 
-  // wrap each SVG as foreignObject
-  const toFO = (svgStr, x, y, w, h) =>
-    `<g transform="translate(${x},${y})">${svgStr.replace(/<svg[^>]*>/, '').replace('</svg>','')}</g>`;
+// ─────────────────────────────────────────────────────────────────────────────
+// ALL VIEWS — engineering sheet (elevation + plan + cross-section + 3D + table)
+// matches reference drawing layout
+// ─────────────────────────────────────────────────────────────────────────────
+function buildAllViewsSVG(b, scale) {
+  const elSVG  = buildElevationSVG(b, scale * 0.62);
+  const planSVG = buildPlanSVG(b, scale * 0.55);
+  const crossSVG = buildCrossSectionSVG(b, scale * 0.52);
+  const isoSVG  = buildIsometricSVG(b, scale * 0.52);
 
-  const combinedSVG = `
-<svg xmlns="http://www.w3.org/2000/svg" width="${totalW}" height="${totalH}" style="font-family:Arial,sans-serif">
-  <rect width="${totalW}" height="${totalH}" fill="#d4d8df"/>
-  <text x="${totalW/2}" y="20" text-anchor="middle" font-size="${Math.max(9,12*scale)}" fill="#1e3a5f" font-weight="bold">
-    ${b.tag} — ASSEMBLY DRAWING  |  ${b.purpose.replace(/_/g,' ').toUpperCase()}  |  W:${b.width_mm}mm × L:${b.length_m}m × θ:${b.incline_deg}° × ${b.hp}HP
-  </text>
-  <!-- ELEVATION -->
-  <g transform="translate(10, 30)">${elSVG.replace(/<svg[^>]*>/, '').replace('</svg>','')}</g>
-  <!-- PLAN -->
-  <g transform="translate(10, ${ed.h+40})">${planSVG.replace(/<svg[^>]*>/, '').replace('</svg>','')}</g>
-  <!-- CROSS SECTION -->
-  <g transform="translate(${pd.w+20}, ${ed.h+40})">${crossSVG.replace(/<svg[^>]*>/, '').replace('</svg>','')}</g>
-  <!-- BORDER -->
-  <rect x="2" y="2" width="${totalW-4}" height="${totalH-4}" fill="none" stroke="#1e3a5f" stroke-width="3" rx="4"/>
-</svg>`;
-  return combinedSVG;
+  function wh(str){
+    const wm=str.match(/width="([^"]+)"/),hm=str.match(/height="([^"]+)"/);
+    return{w:parseFloat(wm?.[1]||400),h:parseFloat(hm?.[1]||300)};
+  }
+  const ed=wh(elSVG), pd=wh(planSVG), cd=wh(crossSVG), id=wh(isoSVG);
+  const strip = svg => svg.replace(/<svg[^>]*>/,'').replace(/<\/svg>/,'');
+
+  const gap=12, margin=16;
+  const bottomW = pd.w + gap + cd.w + gap + id.w;
+  const totalW  = Math.max(ed.w, bottomW) + margin*2;
+
+  // Components list table (matching reference)
+  const compList=[
+    ['1','Drive Pulley (Head)'],['2','Gear Motor + Gearbox'],['3','Motor'],
+    ['4','Coupling (Fluid)'],['5','Support Frame (Head)'],['6','Motor Base'],
+    ['7','Conveyor Belt'],['8','Tail Pulley'],['9','Take-Up Pulley'],
+    ['10','Upper Roller Set'],['11','Upper Troughing Idler Frame'],['12','Lower Return Roller Set'],
+    ['13','Lower Return Idler Frame'],['14','Feed Hopper'],['15','Belt Scraper / Cleaner'],
+    ['16','Support Legs'],['17','Head Pulley Guard'],['18','Primary Scraper (TC Tip)'],
+    ['19','V-Plough Scraper'],['20','Fluid Coupling'],['21','Rigid Coupling'],
+    ['22','Plummer Block + Bearing'],['23','Locking Element'],['24','Sole Plate'],
+    ['25','Skega Pads (UHMWPE)'],['26','Walkway + Handrail'],['27','Wear Plates'],['28','BMS / Pull Cord'],
+  ];
+  const keyFeat=[
+    [`Belt Width`, `${b.width_mm} mm`],
+    [`Belt Length (C/C)`, `${b.length_m} m`],
+    [`Inclination`, `${b.incline_deg}°`],
+    [`Belt Speed`, `${b.belt_speed_mps} m/s`],
+    [`Motor Power`, `${b.hp} HP / ${b.motor_kw} kW`],
+    [`Head Pulley Ø`, `${b.head_pulley_dia_mm} mm`],
+    [`Tail Pulley Ø`, `${b.tail_pulley_dia_mm} mm`],
+    [`Snub Pulley Ø`, `${b.snub_pulley_dia_mm} mm`],
+    [`Carrying Idler Pitch`, `${b.carrying_idler_pitch_mm} mm`],
+    [`Return Idler Pitch`, `${b.return_idler_pitch_mm} mm`],
+    [`Troughing Angle`, `${b.troughing_angle_deg}°`],
+    [`Take-Up Type`, `${b.take_up_type.toUpperCase()}`],
+    [`Frame Type`, `${b.frame_type.toUpperCase()}`],
+    [`Skirt Length`, `${b.skirt_length_m} m`],
+  ];
+  const colW = 200, rowH = 16, nRows = Math.ceil(compList.length/2);
+  const tableH = nRows*rowH + 48, featH = keyFeat.length*rowH + 48;
+  const infoH = Math.max(tableH, featH) + 20;
+  const bottomH = Math.max(pd.h, cd.h, id.h) + gap;
+  const totalH = margin + ed.h + gap + bottomH + gap + infoH + margin + 44;
+
+  // Info section SVG
+  const infoY = margin + ed.h + gap + bottomH + gap;
+  let tableRows='';
+  compList.forEach(([num,name],i)=>{
+    const col=i<nRows?0:1, row=i<nRows?i:i-nRows;
+    const rx=margin+(col*(colW+gap)), ry=infoY+46+row*rowH;
+    const bg=row%2===0?'rgba(21,101,192,0.06)':'white';
+    tableRows+=`<rect x="${rx}" y="${ry}" width="${colW}" height="${rowH}" fill="${bg}"/>
+      <text x="${rx+6}" y="${ry+rowH*0.68}" font-size="8" fill="#1565c0" font-weight="bold" font-family="Arial">${num}</text>
+      <text x="${rx+24}" y="${ry+rowH*0.68}" font-size="8" fill="#1a3a5c" font-family="Arial">${name}</text>`;
+  });
+  let featRows='';
+  keyFeat.forEach(([k,v],i)=>{
+    const rx=margin+colW*2+gap*3, ry=infoY+46+i*rowH;
+    const bg=i%2===0?'rgba(21,101,192,0.06)':'white';
+    featRows+=`<rect x="${rx}" y="${ry}" width="${colW*1.4}" height="${rowH}" fill="${bg}"/>
+      <text x="${rx+6}" y="${ry+rowH*0.68}" font-size="8" fill="#1a3a5c" font-family="Arial">${k}:</text>
+      <text x="${rx+colW*0.78}" y="${ry+rowH*0.68}" font-size="8" fill="#c62828" font-weight="bold" font-family="Arial">${v}</text>`;
+  });
+  const infoSVG=`
+    <rect x="${margin}" y="${infoY}" width="${colW*2+gap}" height="${tableH}" fill="white" stroke="#1565c0" stroke-width="1.5" rx="3"/>
+    <rect x="${margin}" y="${infoY}" width="${colW*2+gap}" height="28" fill="#1565c0" rx="3"/>
+    <text x="${margin+(colW*2+gap)/2}" y="${infoY+18}" text-anchor="middle" font-size="11" fill="white" font-weight="bold" font-family="Arial">COMPONENTS LIST</text>
+    ${tableRows}
+    <rect x="${margin+colW*2+gap*3}" y="${infoY}" width="${colW*1.4}" height="${featH}" fill="white" stroke="#1565c0" stroke-width="1.5" rx="3"/>
+    <rect x="${margin+colW*2+gap*3}" y="${infoY}" width="${colW*1.4}" height="28" fill="#0d47a1" rx="3"/>
+    <text x="${margin+colW*2+gap*3+colW*0.7}" y="${infoY+18}" text-anchor="middle" font-size="11" fill="white" font-weight="bold" font-family="Arial">KEY FEATURES</text>
+    ${featRows}
+    <text x="${margin+colW*2+gap*3+colW*1.4+gap*2}" y="${infoY+20}" font-size="9" fill="#555" font-family="Arial">NOTE: All dimensions in mm</text>
+    <text x="${margin+colW*2+gap*3+colW*1.4+gap*2}" y="${infoY+36}" font-size="9" fill="#555" font-family="Arial">unless otherwise stated.</text>
+    <text x="${margin+colW*2+gap*3+colW*1.4+gap*2}" y="${infoY+52}" font-size="8" fill="#888" font-family="Arial">Drawing is for reference only.</text>
+    <text x="${margin+colW*2+gap*3+colW*1.4+gap*2}" y="${infoY+66}" font-size="8" fill="#888" font-family="Arial">Fabrication drawings to be</text>
+    <text x="${margin+colW*2+gap*3+colW*1.4+gap*2}" y="${infoY+80}" font-size="8" fill="#888" font-family="Arial">issued separately with stamp.</text>`;
+
+  // Title block at bottom
+  const tbY = totalH - 44;
+  const titleBlock=`
+    <rect x="0" y="${tbY}" width="${totalW}" height="44" fill="#0d1b2a"/>
+    <text x="14" y="${tbY+16}" fill="#e3f2fd" font-size="13" font-weight="bold" font-family="Arial">BELT CONVEYOR SYSTEM — TECHNICAL DRAWING</text>
+    <text x="14" y="${tbY+30}" fill="#90caf9" font-size="9" font-family="Arial">${b.tag} | ${b.purpose.replace(/_/g,' ').toUpperCase()} | ${b.width_mm}mm × ${b.length_m}m | ${b.incline_deg}° | ${b.hp}HP</text>
+    <text x="${totalW-14}" y="${tbY+16}" fill="white" font-size="11" font-weight="bold" text-anchor="end" font-family="Arial">PROMAN MACHINERY PVT LTD</text>
+    <text x="${totalW-14}" y="${tbY+30}" fill="#90caf9" font-size="9" text-anchor="end" font-family="Arial">DRG: ${b.tag}-GA-001 | REV: 00 | SCALE: NTS | DATE: ${new Date().toLocaleDateString('en-GB')}</text>`;
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${totalW}" height="${totalH}" style="font-family:Arial,sans-serif;background:#e8ecf0">
+    ${svgDefsNew()}
+    <rect width="${totalW}" height="${totalH}" fill="#d0d8e4"/>
+    <!-- ELEVATION -->
+    <rect x="${margin}" y="${margin}" width="${ed.w}" height="${ed.h}" fill="white" filter="url(#sh)"/>
+    <g transform="translate(${margin},${margin})">${strip(elSVG)}</g>
+    <!-- PLAN -->
+    <rect x="${margin}" y="${margin+ed.h+gap}" width="${pd.w}" height="${pd.h}" fill="white" filter="url(#sh)"/>
+    <g transform="translate(${margin},${margin+ed.h+gap})">${strip(planSVG)}</g>
+    <!-- CROSS-SECTION -->
+    <rect x="${margin+pd.w+gap}" y="${margin+ed.h+gap}" width="${cd.w}" height="${cd.h}" fill="white" filter="url(#sh)"/>
+    <g transform="translate(${margin+pd.w+gap},${margin+ed.h+gap})">${strip(crossSVG)}</g>
+    <!-- ISO -->
+    <rect x="${margin+pd.w+gap+cd.w+gap}" y="${margin+ed.h+gap}" width="${id.w}" height="${id.h}" fill="white" filter="url(#sh)"/>
+    <g transform="translate(${margin+pd.w+gap+cd.w+gap},${margin+ed.h+gap})">${strip(isoSVG)}</g>
+    ${infoSVG}
+    ${titleBlock}
+    <rect x="4" y="4" width="${totalW-8}" height="${totalH-8}" fill="none" stroke="#0d1b2a" stroke-width="3" rx="3"/>
+  </svg>`;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
