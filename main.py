@@ -1049,13 +1049,19 @@ async def get_conveyor_belts(
 
 
 def _make_spec_from_params(tph: int, stages: int, material: str):
-    """Build a PlantSpec from basic params (no override fields)."""
-    from engine.quotation_configs import get_spec
-    try:
-        return get_spec(tph, stages)
-    except Exception:
-        from engine.engine import PlantSpec
-        return PlantSpec(client_name="drawing", tph=tph, stages=stages, material=material)
+    """Build a PlantSpec from basic params by matching tph+stages in ALL_CONFIGS."""
+    from engine.quotation_configs import ALL_CONFIGS
+    from engine.engine import PlantSpec
+    # Find best matching config
+    key = f"{tph}_{stages}s"
+    if key in ALL_CONFIGS:
+        return ALL_CONFIGS[key]["spec"]
+    # Fallback: search by tph and stages
+    for cfg in ALL_CONFIGS.values():
+        if cfg.get("tph") == tph and cfg.get("stages") == stages:
+            return cfg["spec"]
+    # Last resort: bare spec (engine will auto-build conveyors)
+    return PlantSpec(client_name="drawing", tph=tph, stages=stages, material=material)
 
 
 def _infer_inclination(purpose: str) -> float:
