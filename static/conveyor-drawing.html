@@ -279,26 +279,28 @@ function paramChanged() {
 }
 
 function syncParamsFromForm() {
-  const g = id => parseFloat(document.getElementById(id)?.value) || 0;
-  const s = id => document.getElementById(id)?.value || '';
-  _active.width_mm                 = parseInt(s('p-width')) || _active.width_mm;
-  _active.length_m                 = g('p-len')   || _active.length_m;
-  _active.incline_deg              = g('p-inc');
-  _active.belt_speed_mps           = g('p-spd');
-  _active.head_pulley_dia_mm       = g('p-head');
-  _active.tail_pulley_dia_mm       = g('p-tail');
-  _active.snub_pulley_dia_mm       = g('p-snub');
-  _active.bend_pulley_dia_mm       = g('p-bend');
-  _active.troughing_angle_deg      = g('p-trough');
-  _active.carrying_idler_pitch_mm  = g('p-cipitch');
-  _active.return_idler_pitch_mm    = g('p-ripitch');
-  _active.impact_idler_pitch_mm    = g('p-iipitch');
-  _active.motor_kw                 = g('p-kw');
-  _active.hp                       = g('p-hp');
-  _active.take_up_type             = s('p-tkup');
-  _active.take_up_travel_mm        = g('p-tkt');
-  _active.frame_type               = s('p-frame');
-  _active.skirt_length_m           = g('p-skirt');
+  // g() reads a numeric field; falls back to current _active value if blank/zero
+  const g  = (id, cur) => { const v = parseFloat(document.getElementById(id)?.value); return (isFinite(v) && v !== 0) ? v : (cur ?? 0); };
+  const g0 = (id, cur) => { const v = parseFloat(document.getElementById(id)?.value); return isFinite(v) ? v : (cur ?? 0); };  // allows zero (e.g. inclination)
+  const s  = id => document.getElementById(id)?.value || '';
+  _active.width_mm                 = parseInt(s('p-width'))                       || _active.width_mm;
+  _active.length_m                 = g('p-len',   _active.length_m);
+  _active.incline_deg              = g0('p-inc',  _active.incline_deg);
+  _active.belt_speed_mps           = g('p-spd',   _active.belt_speed_mps);
+  _active.head_pulley_dia_mm       = g('p-head',  _active.head_pulley_dia_mm);
+  _active.tail_pulley_dia_mm       = g('p-tail',  _active.tail_pulley_dia_mm);
+  _active.snub_pulley_dia_mm       = g('p-snub',  _active.snub_pulley_dia_mm);
+  _active.bend_pulley_dia_mm       = g('p-bend',  _active.bend_pulley_dia_mm);
+  _active.troughing_angle_deg      = g('p-trough',_active.troughing_angle_deg);
+  _active.carrying_idler_pitch_mm  = g('p-cipitch',_active.carrying_idler_pitch_mm);
+  _active.return_idler_pitch_mm    = g('p-ripitch',_active.return_idler_pitch_mm);
+  _active.impact_idler_pitch_mm    = g('p-iipitch',_active.impact_idler_pitch_mm);
+  _active.motor_kw                 = g('p-kw',    _active.motor_kw);
+  _active.hp                       = g('p-hp',    _active.hp);
+  _active.take_up_type             = s('p-tkup')  || _active.take_up_type;
+  _active.take_up_travel_mm        = g('p-tkt',   _active.take_up_travel_mm);
+  _active.frame_type               = s('p-frame') || _active.frame_type;
+  _active.skirt_length_m           = g('p-skirt', _active.skirt_length_m);
   // recompute derived
   _active.horiz_m = Math.round(_active.length_m * Math.cos(_active.incline_deg*Math.PI/180)*10)/10;
   _active.rise_m  = Math.round(_active.length_m * Math.sin(_active.incline_deg*Math.PI/180)*10)/10;
@@ -323,12 +325,17 @@ function zoomFit()   { _scale = 1.0; renderDrawing(); }
 function renderDrawing() {
   if (!_active) return;
   const area = document.getElementById('drawing-area');
-  let svgContent = '';
-  if (_view === 'elevation') svgContent = buildElevationSVG(_active, _scale);
-  else if (_view === 'plan') svgContent = buildPlanSVG(_active, _scale);
-  else if (_view === 'cross') svgContent = buildCrossSectionSVG(_active, _scale);
-  else svgContent = buildAllViewsSVG(_active, _scale);
-  area.innerHTML = `<div class="drawing-frame">${svgContent}</div>`;
+  try {
+    let svgContent = '';
+    if (_view === 'elevation') svgContent = buildElevationSVG(_active, _scale);
+    else if (_view === 'plan')  svgContent = buildPlanSVG(_active, _scale);
+    else if (_view === 'cross') svgContent = buildCrossSectionSVG(_active, _scale);
+    else                        svgContent = buildAllViewsSVG(_active, _scale);
+    area.innerHTML = `<div class="drawing-frame">${svgContent}</div>`;
+  } catch(e) {
+    area.innerHTML = `<div style="padding:24px;color:red;font-size:.85rem"><b>Drawing error:</b><br>${e.message}<br><pre style="font-size:.7rem;margin-top:8px">${e.stack}</pre></div>`;
+    console.error('renderDrawing error:', e);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -373,12 +380,12 @@ function buildElevationSVG(b, scale) {
   const retBy2 = hy + hp/2 * Math.sin(ang) + beltOff;
 
   // idler positions along carrying strand
-  const ci_pitch = b.carrying_idler_pitch_mm / 1000 * PX_M * scale;
-  const ri_pitch = b.return_idler_pitch_mm   / 1000 * PX_M * scale;
-  const ii_pitch = b.impact_idler_pitch_mm   / 1000 * PX_M * scale;
+  const ci_pitch = Math.max(1, b.carrying_idler_pitch_mm || 1200) / 1000 * PX_M * scale;
+  const ri_pitch = Math.max(1, b.return_idler_pitch_mm   || 3000) / 1000 * PX_M * scale;
+  const ii_pitch = Math.max(1, b.impact_idler_pitch_mm   || 150)  / 1000 * PX_M * scale;
 
   let carrying_idlers = '';
-  let n_ci = Math.floor(L / ci_pitch);
+  let n_ci = Math.min(200, Math.floor(L / ci_pitch));  // cap at 200 to prevent runaway loops
   for (let i = 1; i < n_ci; i++) {
     const t  = i * ci_pitch / L;
     const ix = ox + dX * t;
@@ -396,7 +403,7 @@ function buildElevationSVG(b, scale) {
   }
   // return idlers
   let return_idlers = '';
-  let n_ri = Math.floor(L / ri_pitch);
+  let n_ri = Math.min(100, Math.floor(L / ri_pitch));
   for (let i = 1; i < n_ri; i++) {
     const t  = i * ri_pitch / L;
     const ix = ox + dX * t;
@@ -600,11 +607,11 @@ function buildPlanSVG(b, scale) {
   const oy = H / 2;
   const hp = mm2px(b.head_pulley_dia_mm, scale);
   const tp = mm2px(b.tail_pulley_dia_mm, scale);
-  const ci_pitch = b.carrying_idler_pitch_mm / 1000 * PX_M * scale;
+  const ci_pitch = Math.max(1, b.carrying_idler_pitch_mm || 1200) / 1000 * PX_M * scale;
   const frameW = bw + 20 * scale;
 
   let idler_lines = '';
-  let n_ci = Math.floor(L / ci_pitch);
+  let n_ci = Math.min(200, Math.floor(L / ci_pitch));
   for (let i = 0; i <= n_ci; i++) {
     const t = i / n_ci;
     const x = ox + L * t;
