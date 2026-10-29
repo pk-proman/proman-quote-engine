@@ -1003,7 +1003,6 @@ async def get_conveyor_belts(
     _: dict = Depends(require_login)
 ):
     """Return belt conveyor specs with drawing parameters for the given plant config."""
-    from engine.engine import build_quotation
     spec = _make_spec_from_params(tph, stages, material)
     q = build_quotation(spec)
 
@@ -1050,9 +1049,7 @@ async def get_conveyor_belts(
 
 def _make_spec_from_params(tph: int, stages: int, material: str):
     """Build a PlantSpec from basic params by matching tph+stages in ALL_CONFIGS."""
-    from engine.quotation_configs import ALL_CONFIGS
-    from engine.engine import PlantSpec
-    # Find best matching config
+    # ALL_CONFIGS imported at module top; PlantSpec via engine import at top
     key = f"{tph}_{stages}s"
     if key in ALL_CONFIGS:
         return ALL_CONFIGS[key]["spec"]
