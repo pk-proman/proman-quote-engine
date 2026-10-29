@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Belt Conveyor Drawing — PROMAN</title>
+<style>
+:root{--primary:#1e3a5f;--accent:#e67e22;--bg:#f5f7fa;--card:#fff;--border:#dce1e9;--text:#1a2233;--sub:#5a6a80;--green:#16a34a;--red:#dc2626}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+header{background:var(--primary);color:#fff;padding:12px 24px;display:flex;align-items:center;gap:16px}
+header h1{font-size:1.15rem;font-weight:700;letter-spacing:.3px}
+header .sub{font-size:.8rem;opacity:.7;margin-top:2px}
+.back-btn{margin-left:auto;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;padding:6px 16px;border-radius:6px;cursor:pointer;font-size:.85rem;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
+.back-btn:hover{background:rgba(255,255,255,.22)}
+.layout{display:flex;height:calc(100vh - 56px)}
+/* LEFT PANEL - belt list + params */
+.left-panel{width:340px;min-width:280px;background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.panel-header{padding:14px 16px 10px;border-bottom:1px solid var(--border);background:#f8fafc}
+.panel-header h2{font-size:.95rem;font-weight:700;color:var(--primary)}
+.filter-row{display:flex;gap:8px;margin-top:8px}
+.filter-row select,.filter-row input{font-size:.8rem;padding:5px 8px;border:1px solid var(--border);border-radius:5px;flex:1;background:#fff}
+.load-btn{background:var(--accent);color:#fff;border:none;padding:5px 12px;border-radius:5px;cursor:pointer;font-size:.8rem;white-space:nowrap}
+.load-btn:hover{background:#d35400}
+.belt-list{flex:0 0 auto;overflow-y:auto;max-height:200px;border-bottom:1px solid var(--border)}
+.belt-item{padding:9px 14px;cursor:pointer;border-bottom:1px solid #eef0f3;display:flex;justify-content:space-between;align-items:center;transition:background .12s}
+.belt-item:hover{background:#f0f4ff}
+.belt-item.active{background:#e8eeff;border-left:3px solid var(--primary)}
+.belt-tag{font-weight:700;font-size:.85rem;color:var(--primary)}
+.belt-purpose{font-size:.72rem;color:var(--sub);margin-top:1px;max-width:170px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.belt-dim{font-size:.75rem;color:var(--sub);text-align:right;white-space:nowrap}
+/* PARAMS PANEL */
+.params-panel{flex:1;overflow-y:auto;padding:12px 14px}
+.params-panel h3{font-size:.82rem;font-weight:700;color:var(--primary);padding:6px 0 4px;border-bottom:1px solid var(--border);margin-bottom:6px;margin-top:8px;text-transform:uppercase;letter-spacing:.5px}
+.params-panel h3:first-child{margin-top:0}
+.param-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.param-field{display:flex;flex-direction:column;gap:2px}
+.param-field label{font-size:.7rem;color:var(--sub);font-weight:600}
+.param-field input,.param-field select{font-size:.8rem;padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:#fff;width:100%}
+.param-field input:focus,.param-field select:focus{outline:none;border-color:var(--primary)}
+.param-full{grid-column:1/-1}
+.apply-btn{width:100%;margin-top:10px;background:var(--primary);color:#fff;border:none;padding:8px;border-radius:6px;cursor:pointer;font-size:.85rem;font-weight:600}
+.apply-btn:hover{background:#16304e}
+/* RIGHT PANEL - drawing */
+.right-panel{flex:1;display:flex;flex-direction:column;overflow:hidden;background:#e8ecf1}
+.drawing-toolbar{background:var(--card);border-bottom:1px solid var(--border);padding:8px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.drawing-toolbar span{font-size:.8rem;font-weight:700;color:var(--primary)}
+.view-btn{font-size:.75rem;padding:4px 12px;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:#fff;color:var(--text)}
+.view-btn.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+.zoom-btn{font-size:.9rem;padding:3px 10px;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:#fff}
+.print-btn{margin-left:auto;background:var(--green);color:#fff;border:none;padding:5px 14px;border-radius:5px;cursor:pointer;font-size:.78rem}
+.bom-btn{background:var(--accent);color:#fff;border:none;padding:5px 14px;border-radius:5px;cursor:pointer;font-size:.78rem}
+.drawing-area{flex:1;overflow:auto;display:flex;justify-content:center;align-items:flex-start;padding:16px}
+.drawing-frame{background:#fff;box-shadow:0 2px 16px rgba(0,0,0,.15);border:1px solid #b0b8c4}
+/* BOM TABLE */
+.bom-section{background:var(--card);border-top:1px solid var(--border);max-height:260px;overflow-y:auto;display:none}
+.bom-section.show{display:block}
+.bom-section table{width:100%;font-size:.75rem;border-collapse:collapse}
+.bom-section th{background:var(--primary);color:#fff;padding:6px 10px;text-align:left;position:sticky;top:0}
+.bom-section td{padding:5px 10px;border-bottom:1px solid #eee}
+.bom-section tr:nth-child(even) td{background:#f9fafb}
+/* loading state */
+.loading{display:flex;align-items:center;justify-content:center;height:100%;color:var(--sub);font-size:.9rem;gap:10px}
+.spinner{width:20px;height:20px;border:2px solid #ddd;border-top-color:var(--primary);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>🏗 Belt Conveyor Drawing</h1>
+    <div class="sub">Manufacturing-grade drawings with BOM — PROMAN</div>
+  </div>
+  <a href="/" class="back-btn">← Back to Quote</a>
+</header>
+
+<div class="layout">
+  <!-- LEFT: belt list + param editor -->
+  <div class="left-panel">
+    <div class="panel-header">
+      <h2>Plant Configuration</h2>
+      <div class="filter-row">
+        <select id="sel-tph">
+          <option value="150">150 TPH</option>
+          <option value="250">250 TPH</option>
+          <option value="300" selected>300 TPH</option>
+          <option value="600">600 TPH</option>
+        </select>
+        <select id="sel-stages">
+          <option value="2">2-Stage</option>
+          <option value="3" selected>3-Stage</option>
+        </select>
+        <button class="load-btn" onclick="loadBelts()">Load</button>
+      </div>
+    </div>
+    <div class="belt-list" id="belt-list">
+      <div class="loading"><div class="spinner"></div>Loading belts…</div>
+    </div>
+    <div class="params-panel" id="params-panel">
+      <p style="color:var(--sub);font-size:.8rem;padding:8px 0">Select a belt from the list above to edit its parameters and see the drawing.</p>
+    </div>
+  </div>
+
+  <!-- RIGHT: drawing + toolbar -->
+  <div class="right-panel">
+    <div class="drawing-toolbar">
+      <span>View:</span>
+      <button class="view-btn active" onclick="switchView('elevation')">Side Elevation</button>
+      <button class="view-btn" onclick="switchView('plan')">Plan (Top)</button>
+      <button class="view-btn" onclick="switchView('cross')">Cross-Section</button>
+      <button class="view-btn" onclick="switchView('all')">All Views</button>
+      <span style="margin-left:8px">Zoom:</span>
+      <button class="zoom-btn" onclick="zoom(-0.15)">−</button>
+      <button class="zoom-btn" onclick="zoom(+0.15)">＋</button>
+      <button class="zoom-btn" onclick="zoomFit()">Fit</button>
+      <button class="bom-btn" onclick="toggleBOM()">📋 BOM</button>
+      <button class="print-btn" onclick="printDrawing()">🖨 Print</button>
+    </div>
+    <div class="drawing-area" id="drawing-area">
+      <div class="loading"><div class="spinner"></div>Select a belt to generate drawing…</div>
+    </div>
+    <div class="bom-section" id="bom-section"></div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────────────────────────────────────
+let _belts  = [];        // all belts from API
+let _active = null;      // currently selected belt spec
+let _view   = 'elevation';
+let _scale  = 1.0;
+
+// Drawing constants (px per metre at base scale=1)
+const PX_M = 40;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// API
+// ─────────────────────────────────────────────────────────────────────────────
+async function loadBelts() {
+  const tph    = document.getElementById('sel-tph').value;
+  const stages = document.getElementById('sel-stages').value;
+  document.getElementById('belt-list').innerHTML = '<div class="loading"><div class="spinner"></div>Loading…</div>';
+  document.getElementById('params-panel').innerHTML = '<p style="color:var(--sub);font-size:.8rem;padding:8px">Loading…</p>';
+
+  try {
+    const res  = await fetch(`/api/conveyor-drawing/belts?tph=${tph}&stages=${stages}&material=granite`, {credentials:'include'});
+    const data = await res.json();
+    _belts = data.belts || [];
+    renderBeltList();
+    if (_belts.length) selectBelt(0);
+  } catch(e) {
+    document.getElementById('belt-list').innerHTML = `<p style="padding:12px;color:red">Error: ${e.message}</p>`;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BELT LIST
+// ─────────────────────────────────────────────────────────────────────────────
+function renderBeltList() {
+  const el = document.getElementById('belt-list');
+  if (!_belts.length) { el.innerHTML = '<p style="padding:12px;color:var(--sub)">No belts found.</p>'; return; }
+  el.innerHTML = _belts.map((b, i) => `
+    <div class="belt-item" id="belt-item-${i}" onclick="selectBelt(${i})">
+      <div>
+        <div class="belt-tag">${b.tag}</div>
+        <div class="belt-purpose">${b.purpose.replace(/_/g,' ')}</div>
+      </div>
+      <div class="belt-dim">${b.width_mm}×${b.length_m}m<br>${b.hp}HP</div>
+    </div>
+  `).join('');
+}
+
+function selectBelt(idx) {
+  document.querySelectorAll('.belt-item').forEach(e => e.classList.remove('active'));
+  const el = document.getElementById(`belt-item-${idx}`);
+  if (el) el.classList.add('active');
+  _active = JSON.parse(JSON.stringify(_belts[idx]));  // deep copy for edits
+  renderParams();
+  renderDrawing();
+  renderBOM();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PARAMETER EDITOR
+// ─────────────────────────────────────────────────────────────────────────────
+function renderParams() {
+  const b = _active;
+  document.getElementById('params-panel').innerHTML = `
+    <h3>Geometry</h3>
+    <div class="param-grid">
+      <div class="param-field"><label>Width (mm)</label>
+        <select id="p-width" onchange="paramChanged()">
+          ${[500,650,800,1000,1200].map(w=>`<option value="${w}"${b.width_mm==w?' selected':''}>${w}</option>`).join('')}
+        </select>
+      </div>
+      <div class="param-field"><label>C-C Length (m)</label>
+        <input type="number" id="p-len" value="${b.length_m}" step="0.5" min="2" onchange="paramChanged()">
+      </div>
+      <div class="param-field"><label>Inclination (°)</label>
+        <input type="number" id="p-inc" value="${b.incline_deg}" step="0.5" min="0" max="20" onchange="paramChanged()">
+      </div>
+      <div class="param-field"><label>Belt Speed (m/s)</label>
+        <input type="number" id="p-spd" value="${b.belt_speed_mps}" step="0.25" min="0.5" max="4" onchange="paramChanged()">
+      </div>
+    </div>
+    <h3>Pulleys</h3>
+    <div class="param-grid">
+      <div class="param-field"><label>Head Pulley Ø (mm)</label>
+        <input type="number" id="p-head" value="${b.head_pulley_dia_mm}" step="10" onchange="paramChanged()">
+      </div>
+      <div class="param-field"><label>Tail Pulley Ø (mm)</label>
+        <input type="number" id="p-tail" value="${b.tail_pulley_dia_mm}" step="10" onchange="paramChanged()">
+      </div>
+      <div class="param-field"><label>Snub Pulley Ø (mm)</label>
+        <input type="number" id="p-snub" value="${b.snub_pulley_dia_mm}" step="10" onchange="paramChanged()">
+      </div>
+      <div class="param-field"><label>Bend Pulley Ø (mm)</label>
+        <input type="number" id="p-bend" value="${b.bend_pulley_dia_mm}" step="10" onchange="paramChanged()">
+      </div>
+    </div>
+    <h3>Idlers</h3>
+    <div class="param-grid">
+      <div class="param-field"><label>Troughing Angle (°)</label>
+        <select id="p-trough" onchange="paramChanged()">
+          ${[20,35,45].map(a=>`<option value="${a}"${b.troughing_angle_deg==a?' selected':''}>${a}°</option>`).join('')}
+        </select>
+      </div>
+      <div class="param-field"><label>Carry Idler Pitch (mm)</label>
+        <input type="number" id="p-cipitch" value="${b.carrying_idler_pitch_mm}" step="100" onchange="paramChanged()">
+      </div>
+      <div class="param-field"><label>Return Idler Pitch (mm)</label>
+        <input type="number" id="p-ripitch" value="${b.return_idler_pitch_mm}" step="500" onchange="paramChanged()">
+      </div>
+      <div class="param-field"><label>Impact Idler Pitch (mm)</label>
+        <input type="number" id="p-iipitch" value="${b.impact_idler_pitch_mm}" step="50" onchange="paramChanged()">
+      </div>
+    </div>
+    <h3>Drive & Take-Up</h3>
+    <div class="param-grid">
+      <div class="param-field"><label>Motor (kW)</label>
+        <input type="number" id="p-kw" value="${b.motor_kw}" step="1" min="1" onchange="paramChanged()">
+      </div>
+      <div class="param-field"><label>HP</label>
+        <input type="number" id="p-hp" value="${b.hp}" step="1" min="1" onchange="paramChanged()">
+      </div>
+      <div class="param-field"><label>Take-Up Type</label>
+        <select id="p-tkup" onchange="paramChanged()">
+          <option value="gravity"${b.take_up_type=='gravity'?' selected':''}>Gravity</option>
+          <option value="screw"${b.take_up_type=='screw'?' selected':''}>Screw</option>
+          <option value="winch"${b.take_up_type=='winch'?' selected':''}>Winch</option>
+        </select>
+      </div>
+      <div class="param-field"><label>Take-Up Travel (mm)</label>
+        <input type="number" id="p-tkt" value="${b.take_up_travel_mm}" step="50" onchange="paramChanged()">
+      </div>
+    </div>
+    <h3>Frame & Skirt</h3>
+    <div class="param-grid">
+      <div class="param-field"><label>Frame Type</label>
+        <select id="p-frame" onchange="paramChanged()">
+          <option value="channel"${b.frame_type=='channel'?' selected':''}>Channel Frame</option>
+          <option value="truss"${b.frame_type=='truss'?' selected':''}>Truss Frame</option>
+        </select>
+      </div>
+      <div class="param-field"><label>Skirt Length (m)</label>
+        <input type="number" id="p-skirt" value="${b.skirt_length_m}" step="0.5" min="0.5" onchange="paramChanged()">
+      </div>
+    </div>
+    <button class="apply-btn" onclick="applyParams()">↻ Redraw</button>
+  `;
+}
+
+function paramChanged() {
+  // live-sync _active from form (debounced redraw on applyParams)
+  syncParamsFromForm();
+  renderDrawing();
+}
+
+function syncParamsFromForm() {
+  const g = id => parseFloat(document.getElementById(id)?.value) || 0;
+  const s = id => document.getElementById(id)?.value || '';
+  _active.width_mm                 = parseInt(s('p-width')) || _active.width_mm;
+  _active.length_m                 = g('p-len')   || _active.length_m;
+  _active.incline_deg              = g('p-inc');
+  _active.belt_speed_mps           = g('p-spd');
+  _active.head_pulley_dia_mm       = g('p-head');
+  _active.tail_pulley_dia_mm       = g('p-tail');
+  _active.snub_pulley_dia_mm       = g('p-snub');
+  _active.bend_pulley_dia_mm       = g('p-bend');
+  _active.troughing_angle_deg      = g('p-trough');
+  _active.carrying_idler_pitch_mm  = g('p-cipitch');
+  _active.return_idler_pitch_mm    = g('p-ripitch');
+  _active.impact_idler_pitch_mm    = g('p-iipitch');
+  _active.motor_kw                 = g('p-kw');
+  _active.hp                       = g('p-hp');
+  _active.take_up_type             = s('p-tkup');
+  _active.take_up_travel_mm        = g('p-tkt');
+  _active.frame_type               = s('p-frame');
+  _active.skirt_length_m           = g('p-skirt');
+  // recompute derived
+  _active.horiz_m = Math.round(_active.length_m * Math.cos(_active.incline_deg*Math.PI/180)*10)/10;
+  _active.rise_m  = Math.round(_active.length_m * Math.sin(_active.incline_deg*Math.PI/180)*10)/10;
+  _active.num_idler_sets = Math.ceil(_active.horiz_m / (_active.carrying_idler_pitch_mm/1000)) + 1;
+}
+
+function applyParams() { syncParamsFromForm(); renderDrawing(); renderBOM(); }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DRAWING VIEWS
+// ─────────────────────────────────────────────────────────────────────────────
+function switchView(v) {
+  _view = v;
+  document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  renderDrawing();
+}
+
+function zoom(delta) { _scale = Math.max(0.3, Math.min(3, _scale + delta)); renderDrawing(); }
+function zoomFit()   { _scale = 1.0; renderDrawing(); }
+
+function renderDrawing() {
+  if (!_active) return;
+  const area = document.getElementById('drawing-area');
+  let svgContent = '';
+  if (_view === 'elevation') svgContent = buildElevationSVG(_active, _scale);
+  else if (_view === 'plan') svgContent = buildPlanSVG(_active, _scale);
+  else if (_view === 'cross') svgContent = buildCrossSectionSVG(_active, _scale);
+  else svgContent = buildAllViewsSVG(_active, _scale);
+  area.innerHTML = `<div class="drawing-frame">${svgContent}</div>`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SVG DRAWING BUILDERS
+// ─────────────────────────────────────────────────────────────────────────────
+
+function mm2px(mm, scale) { return mm / 1000 * PX_M * scale; }
+
+// ELEVATION (side view)
+function buildElevationSVG(b, scale) {
+  const L  = b.length_m * PX_M * scale;       // C-C length in px
+  const ang = b.incline_deg * Math.PI / 180;
+  const dX = L * Math.cos(ang);
+  const dY = L * Math.sin(ang);
+  const hp = mm2px(b.head_pulley_dia_mm, scale);
+  const tp = mm2px(b.tail_pulley_dia_mm, scale);
+  const sp = mm2px(b.snub_pulley_dia_mm, scale);
+  const bp = mm2px(b.bend_pulley_dia_mm, scale);
+  const bw = mm2px(b.width_mm, scale);          // belt width in px (used as frame height reference)
+  const margin = 80 * scale;
+  const W = dX + margin * 2 + 80 * scale;
+  const H = dY + margin * 2 + 100 * scale;
+  const ox = margin;             // tail origin X
+  const oy = H - margin - 30 * scale;  // tail origin Y (bottom)
+  const hx = ox + dX;           // head X
+  const hy = oy - dY;           // head Y (higher)
+
+  // frame beam thickness
+  const ft = Math.max(4, 6 * scale);
+  // belt offset above centre line (half belt width conceptually = 10% of L)
+  const beltOff = bw * 0.12;
+
+  // carrying top belt line
+  const topBx1 = ox + tp/2 * Math.cos(ang);
+  const topBy1 = oy - tp/2 * Math.sin(ang) - beltOff;
+  const topBx2 = hx - hp/2 * Math.cos(ang);
+  const topBy2 = hy + hp/2 * Math.sin(ang) - beltOff;
+  // return bottom belt line
+  const retBx1 = ox + tp/2 * Math.cos(ang);
+  const retBy1 = oy - tp/2 * Math.sin(ang) + beltOff;
+  const retBx2 = hx - hp/2 * Math.cos(ang);
+  const retBy2 = hy + hp/2 * Math.sin(ang) + beltOff;
+
+  // idler positions along carrying strand
+  const ci_pitch = b.carrying_idler_pitch_mm / 1000 * PX_M * scale;
+  const ri_pitch = b.return_idler_pitch_mm   / 1000 * PX_M * scale;
+  const ii_pitch = b.impact_idler_pitch_mm   / 1000 * PX_M * scale;
+
+  let carrying_idlers = '';
+  let n_ci = Math.floor(L / ci_pitch);
+  for (let i = 1; i < n_ci; i++) {
+    const t  = i * ci_pitch / L;
+    const ix = ox + dX * t;
+    const iy = oy - dY * t;
+    const ir = Math.max(3, 5 * scale);
+    carrying_idlers += `<circle cx="${ix}" cy="${iy - beltOff}" r="${ir}" fill="#555" stroke="#333" stroke-width="1"/>`;
+  }
+  // impact idlers near tail (3 sets)
+  for (let i = 0; i < 3; i++) {
+    const t  = (i+1) * ii_pitch / L;
+    const ix = ox + dX * t;
+    const iy = oy - dY * t;
+    const ir = Math.max(4, 6 * scale);
+    carrying_idlers += `<circle cx="${ix}" cy="${iy - beltOff}" r="${ir}" fill="#c0392b" stroke="#922b21" stroke-width="1"/>`;
+  }
+  // return idlers
+  let return_idlers = '';
+  let n_ri = Math.floor(L / ri_pitch);
+  for (let i = 1; i < n_ri; i++) {
+    const t  = i * ri_pitch / L;
+    const ix = ox + dX * t;
+    const iy = oy - dY * t;
+    const ir = Math.max(2, 4 * scale);
+    return_idlers += `<circle cx="${ix}" cy="${iy + beltOff}" r="${ir}" fill="#888" stroke="#555" stroke-width="0.5"/>`;
+  }
+
+  // truss frame (zigzag diagonals every ~3m)
+  let truss = '';
+  if (b.frame_type === 'truss') {
+    const seg = Math.max(2, PX_M * scale * 3);
+    const n_segs = Math.floor(L / seg);
+    for (let i = 0; i < n_segs; i++) {
+      const t1 = i     * seg / L, t2 = (i+1) * seg / L;
+      const x1 = ox + dX*t1, y1 = oy - dY*t1;
+      const x2 = ox + dX*t2, y2 = oy - dY*t2;
+      const frameH = Math.max(12, 16 * scale);
+      // lower chord
+      const perpX = Math.sin(ang) * frameH;
+      const perpY = Math.cos(ang) * frameH;
+      if (i % 2 === 0) {
+        truss += `<line x1="${x1}" y1="${y1+perpY}" x2="${x2}" y2="${y2-perpY}" stroke="#777" stroke-width="${Math.max(1,1.5*scale)}" stroke-dasharray="2,2"/>`;
+      } else {
+        truss += `<line x1="${x1}" y1="${y1-perpY}" x2="${x2}" y2="${y2+perpY}" stroke="#777" stroke-width="${Math.max(1,1.5*scale)}" stroke-dasharray="2,2"/>`;
+      }
+    }
+  }
+
+  // take-up assembly near tail
+  let takeup = '';
+  const tkH = Math.max(12, 18 * scale);
+  const tkX = ox - 20*scale;
+  const tkY = oy + beltOff + 5*scale;
+  if (b.take_up_type === 'gravity') {
+    takeup = `
+      <rect x="${tkX-6*scale}" y="${tkY}" width="${12*scale}" height="${tkH}" fill="#aaa" stroke="#555" stroke-width="1" rx="2"/>
+      <circle cx="${tkX}" cy="${tkY + tkH + 6*scale}" r="${Math.max(3,5*scale)}" fill="#666"/>
+      <line x1="${tkX}" y1="${tkY+tkH}" x2="${tkX}" y2="${tkY+tkH+14*scale}" stroke="#555" stroke-width="1"/>
+    `;
+  } else {
+    // screw take-up
+    takeup = `
+      <rect x="${tkX-3*scale}" y="${tkY - tkH*0.3}" width="${6*scale}" height="${tkH*1.3}" fill="#aaa" stroke="#555" stroke-width="1" rx="1"/>
+      <line x1="${tkX}" y1="${tkY-tkH*0.3}" x2="${tkX}" y2="${tkY-tkH*0.3-8*scale}" stroke="#555" stroke-width="1.5"/>
+    `;
+  }
+
+  // skirt board near tail
+  const skirtLen = b.skirt_length_m * PX_M * scale;
+  const skirtPts = [
+    [ox, oy - beltOff],
+    [ox + dX*skirtLen/L, oy - dY*skirtLen/L - beltOff],
+  ];
+
+  // dimension lines
+  function dimLine(x1,y1,x2,y2,label,offset) {
+    const mx=(x1+x2)/2, my=(y1+y2)/2;
+    return `
+      <line x1="${x1}" y1="${y1+offset}" x2="${x2}" y2="${y2+offset}" stroke="#e67e22" stroke-width="1" stroke-dasharray="4,2" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+      <text x="${mx}" y="${my+offset-5}" text-anchor="middle" font-size="${Math.max(8,10*scale)}" fill="#d35400" font-weight="bold">${label}</text>`;
+  }
+
+  // support legs (every ~5m, 2 min)
+  let legs = '';
+  const legSpacing = PX_M * scale * 5;
+  const n_legs = Math.max(2, Math.floor(L / legSpacing));
+  for (let i = 0; i <= n_legs; i++) {
+    const t = i / n_legs;
+    const lx = ox + dX * t;
+    const ly = oy - dY * t;
+    const legH = Math.max(8, 12 * scale) + dY * t;
+    legs += `<line x1="${lx}" y1="${ly+beltOff+2}" x2="${lx}" y2="${ly+legH}" stroke="#666" stroke-width="${Math.max(1.5,2*scale)}"/>`;
+    legs += `<line x1="${lx-8*scale}" y1="${ly+legH}" x2="${lx+8*scale}" y2="${ly+legH}" stroke="#444" stroke-width="${Math.max(2,3*scale)}"/>`;
+  }
+
+  // drive assembly at head
+  const motorW = Math.max(18, 24 * scale);
+  const motorH = Math.max(10, 14 * scale);
+  const driveX = hx + 10*scale;
+  const driveY = hy - motorH/2;
+
+  // discharge chute
+  const dcW = Math.max(8, 12*scale);
+
+  // title block
+  const titleY = H - 28*scale;
+
+  const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" style="font-family:Arial,sans-serif">
+  <defs>
+    <marker id="arrow" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#e67e22"/>
+    </marker>
+    <pattern id="hatch" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
+      <line x1="0" y1="0" x2="0" y2="6" stroke="#bbb" stroke-width="1"/>
+    </pattern>
+  </defs>
+
+  <!-- BACKGROUND GRID -->
+  <rect width="${W}" height="${H}" fill="#fafbfc"/>
+
+  <!-- TITLE BLOCK -->
+  <rect x="0" y="${H-32*scale}" width="${W}" height="${32*scale}" fill="#1e3a5f" rx="0"/>
+  <text x="10" y="${H-16*scale}" fill="white" font-size="${Math.max(8,10*scale)}" font-weight="bold">${b.tag} — SIDE ELEVATION</text>
+  <text x="10" y="${H-5*scale}" fill="#a8c4e0" font-size="${Math.max(7,9*scale)}">${b.purpose.replace(/_/g,' ').toUpperCase()} | W:${b.width_mm}mm | L:${b.length_m}m | θ:${b.incline_deg}° | ${b.hp}HP</text>
+  <text x="${W-10}" y="${H-16*scale}" fill="#a8c4e0" font-size="${Math.max(7,9*scale)}" text-anchor="end">PROMAN MACHINERY PVT LTD</text>
+  <text x="${W-10}" y="${H-5*scale}" fill="#a8c4e0" font-size="${Math.max(6,8*scale)}" text-anchor="end">DRG NO: ${b.tag}-E-001 | REV: 00</text>
+
+  <!-- SUPPORT LEGS -->
+  ${legs}
+
+  <!-- TRUSS / FRAME DIAGONALS -->
+  ${truss}
+
+  <!-- CENTRE LINE (chassis) -->
+  <line x1="${ox}" y1="${oy}" x2="${hx}" y2="${hy}" stroke="#2c3e50" stroke-width="${Math.max(3,4*scale)}" stroke-linecap="round"/>
+
+  <!-- LOWER CHORD (frame bottom) -->
+  <line x1="${ox}" y1="${oy+8*scale}" x2="${hx}" y2="${hy+8*scale}" stroke="#2c3e50" stroke-width="${Math.max(1.5,2*scale)}"/>
+
+  <!-- RETURN BELT -->
+  <line x1="${retBx1}" y1="${retBy1}" x2="${retBx2}" y2="${retBy2}" stroke="#c8a000" stroke-width="${Math.max(1.5,2*scale)}" stroke-dasharray="8,4"/>
+
+  <!-- CARRYING BELT -->
+  <line x1="${topBx1}" y1="${topBy1}" x2="${topBx2}" y2="${topBy2}" stroke="#c8a000" stroke-width="${Math.max(2,3*scale)}"/>
+
+  <!-- CARRYING IDLERS -->
+  ${carrying_idlers}
+
+  <!-- RETURN IDLERS -->
+  ${return_idlers}
+
+  <!-- TAIL PULLEY -->
+  <circle cx="${ox}" cy="${oy}" r="${tp/2}" fill="#6c7a8e" stroke="#34495e" stroke-width="${Math.max(1.5,2*scale)}"/>
+  <circle cx="${ox}" cy="${oy}" r="${tp/4}" fill="#95a5a6"/>
+  <text x="${ox}" y="${oy+tp/2+12*scale}" text-anchor="middle" font-size="${Math.max(7,9*scale)}" fill="#555">TAIL Ø${b.tail_pulley_dia_mm}</text>
+
+  <!-- HEAD PULLEY -->
+  <circle cx="${hx}" cy="${hy}" r="${hp/2}" fill="#2c3e50" stroke="#1a252f" stroke-width="${Math.max(1.5,2*scale)}"/>
+  <circle cx="${hx}" cy="${hy}" r="${hp/4}" fill="#566573"/>
+  <text x="${hx}" y="${hy-hp/2-5*scale}" text-anchor="middle" font-size="${Math.max(7,9*scale)}" fill="#555">HEAD Ø${b.head_pulley_dia_mm}</text>
+
+  <!-- SNUB PULLEY near head -->
+  <circle cx="${hx-sp*1.2}" cy="${hy+sp*0.8}" r="${sp/2}" fill="#8e9eab" stroke="#5d6d7e" stroke-width="${Math.max(1,1.5*scale)}"/>
+  <text x="${hx-sp*1.2}" y="${hy+sp*0.8+sp/2+10*scale}" text-anchor="middle" font-size="${Math.max(6,8*scale)}" fill="#777">SNUB Ø${b.snub_pulley_dia_mm}</text>
+
+  <!-- TAKE-UP -->
+  ${takeup}
+
+  <!-- SKIRT BOARD -->
+  <line x1="${skirtPts[0][0]}" y1="${skirtPts[0][1]-beltOff*0.5}" x2="${skirtPts[1][0]}" y2="${skirtPts[1][1]-beltOff*0.5}" stroke="#c0392b" stroke-width="${Math.max(2,3*scale)}" opacity="0.7"/>
+  <text x="${ox+skirtLen/2}" y="${oy-beltOff*1.5-5*scale}" text-anchor="middle" font-size="${Math.max(6,8*scale)}" fill="#c0392b">SKIRT ${b.skirt_length_m}m</text>
+
+  <!-- DRIVE MOTOR BOX -->
+  <rect x="${driveX}" y="${driveY}" width="${motorW}" height="${motorH}" fill="#e67e22" stroke="#d35400" stroke-width="1" rx="2"/>
+  <text x="${driveX+motorW/2}" y="${driveY+motorH/2+3}" text-anchor="middle" font-size="${Math.max(6,7.5*scale)}" fill="white" font-weight="bold">MOTOR</text>
+  <text x="${driveX+motorW/2}" y="${driveY-4*scale}" text-anchor="middle" font-size="${Math.max(6,7.5*scale)}" fill="#d35400">${b.motor_kw}kW/${b.hp}HP</text>
+
+  <!-- DISCHARGE CHUTE -->
+  <polygon points="${hx},${hy+hp/2} ${hx+dcW},${hy+hp/2} ${hx+dcW*0.6},${hy+hp/2+dcW*2} ${hx-dcW*0.2},${hy+hp/2+dcW*2}" fill="#7f8c8d" stroke="#5d6d7e" stroke-width="1" opacity="0.8"/>
+  <text x="${hx+dcW*0.5}" y="${hy+hp/2+dcW*2+10*scale}" text-anchor="middle" font-size="${Math.max(6,8*scale)}" fill="#555">DISCH. CHUTE</text>
+
+  <!-- FEED CHUTE -->
+  <polygon points="${ox-dcW*0.2},${oy-tp/2} ${ox+dcW},${oy-tp/2} ${ox+dcW*0.8},${oy-tp/2-dcW*2} ${ox-dcW*0.6},${oy-tp/2-dcW*2}" fill="#7f8c8d" stroke="#5d6d7e" stroke-width="1" opacity="0.8"/>
+  <text x="${ox}" y="${oy-tp/2-dcW*2-5*scale}" text-anchor="middle" font-size="${Math.max(6,8*scale)}" fill="#555">FEED CHUTE</text>
+
+  <!-- DIMENSION: C-C LENGTH -->
+  <line x1="${ox}" y1="${oy+32*scale}" x2="${hx}" y2="${hy+32*scale}" stroke="#e67e22" stroke-width="1" stroke-dasharray="4,2"/>
+  <text x="${(ox+hx)/2}" y="${(oy+hy)/2+40*scale}" text-anchor="middle" font-size="${Math.max(7,9*scale)}" fill="#d35400" font-weight="bold">C/C = ${b.length_m} m</text>
+  <line x1="${ox}" y1="${oy+25*scale}" x2="${ox}" y2="${oy+38*scale}" stroke="#e67e22" stroke-width="1"/>
+  <line x1="${hx}" y1="${hy+25*scale}" x2="${hx}" y2="${hy+38*scale}" stroke="#e67e22" stroke-width="1"/>
+
+  <!-- RISE DIMENSION (if inclined) -->
+  ${b.incline_deg > 1 ? `
+  <line x1="${hx+20*scale}" y1="${oy}" x2="${hx+20*scale}" y2="${hy}" stroke="#2980b9" stroke-width="1" stroke-dasharray="4,2"/>
+  <text x="${hx+28*scale}" y="${(oy+hy)/2}" text-anchor="start" font-size="${Math.max(7,9*scale)}" fill="#2980b9" font-weight="bold">H=${b.rise_m}m</text>
+  <line x1="${hx+15*scale}" y1="${hy}" x2="${hx+25*scale}" y2="${hy}" stroke="#2980b9" stroke-width="1"/>
+  <line x1="${hx+15*scale}" y1="${oy}" x2="${hx+25*scale}" y2="${oy}" stroke="#2980b9" stroke-width="1"/>
+  ` : ''}
+
+  <!-- INCLINATION ANGLE ARC -->
+  ${b.incline_deg > 1 ? `
+  <path d="M${ox+30*scale},${oy} A${30*scale},${30*scale} 0 0,0 ${ox+30*scale*Math.cos(ang)},${oy-30*scale*Math.sin(ang)}" fill="none" stroke="#2980b9" stroke-width="1.5" stroke-dasharray="3,2"/>
+  <text x="${ox+36*scale}" y="${oy-8*scale}" font-size="${Math.max(7,10*scale)}" fill="#2980b9" font-weight="bold">${b.incline_deg}°</text>
+  ` : ''}
+
+  <!-- BORDER -->
+  <rect x="2" y="2" width="${W-4}" height="${H-4}" fill="none" stroke="#1e3a5f" stroke-width="2" rx="3"/>
+</svg>`;
+  return svg;
+}
+
+// PLAN VIEW (top)
+function buildPlanSVG(b, scale) {
+  const L  = b.length_m * PX_M * scale;
+  const W  = L + 120 * scale;
+  const bw = mm2px(b.width_mm, scale);
+  const H  = bw * 3 + 120 * scale;
+  const ox = 50 * scale;
+  const oy = H / 2;
+  const hp = mm2px(b.head_pulley_dia_mm, scale);
+  const tp = mm2px(b.tail_pulley_dia_mm, scale);
+  const ci_pitch = b.carrying_idler_pitch_mm / 1000 * PX_M * scale;
+  const frameW = bw + 20 * scale;
+
+  let idler_lines = '';
+  let n_ci = Math.floor(L / ci_pitch);
+  for (let i = 0; i <= n_ci; i++) {
+    const t = i / n_ci;
+    const x = ox + L * t;
+    idler_lines += `<line x1="${x}" y1="${oy - bw/2 - 5*scale}" x2="${x}" y2="${oy + bw/2 + 5*scale}" stroke="#555" stroke-width="${Math.max(1,1.5*scale)}"/>`;
+  }
+  // impact idlers (red, near tail)
+  for (let i = 0; i < 3; i++) {
+    const x = ox + ci_pitch * (i + 0.5);
+    idler_lines += `<line x1="${x}" y1="${oy - bw/2 - 5*scale}" x2="${x}" y2="${oy + bw/2 + 5*scale}" stroke="#c0392b" stroke-width="${Math.max(1.5,2*scale)}"/>`;
+  }
+
+  const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" style="font-family:Arial,sans-serif">
+  <rect width="${W}" height="${H}" fill="#fafbfc"/>
+
+  <!-- FRAME OUTLINE -->
+  <rect x="${ox-tp/2}" y="${oy-frameW/2}" width="${L+hp/2+tp/2}" height="${frameW}" fill="#eef" stroke="#2c3e50" stroke-width="${Math.max(1.5,2*scale)}" rx="4"/>
+
+  <!-- BELT OUTLINE -->
+  <rect x="${ox-tp/2}" y="${oy-bw/2}" width="${L+hp/2+tp/2}" height="${bw}" fill="#f5d76e" stroke="#c8a000" stroke-width="${Math.max(1.5,2*scale)}" rx="3"/>
+
+  <!-- CENTRE LINE -->
+  <line x1="${ox-tp*0.7}" y1="${oy}" x2="${ox+L+hp*0.7}" y2="${oy}" stroke="#e67e22" stroke-width="1" stroke-dasharray="10,5"/>
+  <text x="${ox+L/2}" y="${oy-5}" text-anchor="middle" font-size="${Math.max(7,8*scale)}" fill="#d35400">CL</text>
+
+  <!-- CARRYING IDLERS -->
+  ${idler_lines}
+
+  <!-- TAIL PULLEY -->
+  <ellipse cx="${ox}" cy="${oy}" rx="${tp/6}" ry="${tp/2}" fill="#6c7a8e" stroke="#34495e" stroke-width="${Math.max(1.5,2*scale)}"/>
+  <text x="${ox}" y="${oy+tp/2+12*scale}" text-anchor="middle" font-size="${Math.max(7,9*scale)}" fill="#555">TAIL</text>
+
+  <!-- HEAD PULLEY -->
+  <ellipse cx="${ox+L}" cy="${oy}" rx="${hp/6}" ry="${hp/2}" fill="#2c3e50" stroke="#1a252f" stroke-width="${Math.max(1.5,2*scale)}"/>
+  <text x="${ox+L}" y="${oy+hp/2+12*scale}" text-anchor="middle" font-size="${Math.max(7,9*scale)}" fill="#555">HEAD</text>
+
+  <!-- MOTOR (top-right) -->
+  <rect x="${ox+L+15*scale}" y="${oy-12*scale}" width="${24*scale}" height="${24*scale}" fill="#e67e22" stroke="#d35400" stroke-width="1" rx="3"/>
+  <text x="${ox+L+27*scale}" y="${oy+3}" text-anchor="middle" font-size="${Math.max(6,7*scale)}" fill="white" font-weight="bold">MTR</text>
+
+  <!-- SKIRT -->
+  <rect x="${ox}" y="${oy-bw/2-4*scale}" width="${b.skirt_length_m*PX_M*scale}" height="${8*scale}" fill="#c0392b" opacity="0.5"/>
+  <rect x="${ox}" y="${oy+bw/2-4*scale}" width="${b.skirt_length_m*PX_M*scale}" height="${8*scale}" fill="#c0392b" opacity="0.5"/>
+  <text x="${ox+b.skirt_length_m*PX_M*scale/2}" y="${oy-bw/2-8*scale}" text-anchor="middle" font-size="${Math.max(6,7*scale)}" fill="#c0392b">SKIRT BOARD ${b.skirt_length_m}m</text>
+
+  <!-- DIMENSION -->
+  <line x1="${ox}" y1="${H-40*scale}" x2="${ox+L}" y2="${H-40*scale}" stroke="#e67e22" stroke-width="1" stroke-dasharray="4,2"/>
+  <text x="${ox+L/2}" y="${H-44*scale}" text-anchor="middle" font-size="${Math.max(7,9*scale)}" fill="#d35400" font-weight="bold">C/C = ${b.length_m} m</text>
+  <line x1="${ox}" y1="${H-46*scale}" x2="${ox}" y2="${H-34*scale}" stroke="#e67e22" stroke-width="1"/>
+  <line x1="${ox+L}" y1="${H-46*scale}" x2="${ox+L}" y2="${H-34*scale}" stroke="#e67e22" stroke-width="1"/>
+
+  <!-- WIDTH DIM -->
+  <line x1="${ox-tp/2-20*scale}" y1="${oy-bw/2}" x2="${ox-tp/2-20*scale}" y2="${oy+bw/2}" stroke="#2980b9" stroke-width="1" stroke-dasharray="4,2"/>
+  <text x="${ox-tp/2-26*scale}" y="${oy+4}" text-anchor="end" font-size="${Math.max(7,9*scale)}" fill="#2980b9" font-weight="bold">${b.width_mm}mm</text>
+
+  <!-- VIEW LABEL -->
+  <text x="${W/2}" y="${H-8*scale}" text-anchor="middle" font-size="${Math.max(8,10*scale)}" fill="white" font-weight="bold">PLAN VIEW (TOP)</text>
+
+  <!-- TITLE BLOCK -->
+  <rect x="0" y="${H-28*scale}" width="${W}" height="${28*scale}" fill="#1e3a5f" rx="0"/>
+  <text x="10" y="${H-14*scale}" fill="white" font-size="${Math.max(8,10*scale)}" font-weight="bold">${b.tag} — PLAN VIEW</text>
+  <text x="10" y="${H-4*scale}" fill="#a8c4e0" font-size="${Math.max(6,8*scale)}">${b.purpose.replace(/_/g,' ').toUpperCase()} | W:${b.width_mm}mm | L:${b.length_m}m | ${b.hp}HP</text>
+  <text x="${W-10}" y="${H-4*scale}" fill="#a8c4e0" font-size="${Math.max(6,8*scale)}" text-anchor="end">PROMAN MACHINERY — DRG NO: ${b.tag}-P-001</text>
+  <rect x="2" y="2" width="${W-4}" height="${H-4}" fill="none" stroke="#1e3a5f" stroke-width="2" rx="3"/>
+</svg>`;
+  return svg;
+}
+
+// CROSS-SECTION (A-A) — troughed idler view
+function buildCrossSectionSVG(b, scale) {
+  const bw  = mm2px(b.width_mm, scale);
+  const ang = b.troughing_angle_deg * Math.PI / 180;
+  const S   = 200 * scale;  // half svg size
+  const W   = S * 2 + 60 * scale;
+  const H   = S * 1.6 + 80 * scale;
+  const cx  = W / 2;
+  const cy  = H / 2 - 10 * scale;
+
+  // Idler geometry: 3 rolls, centre + 2 wing rolls
+  const wing_len = bw * 0.42;
+  const ctr_len  = bw * 0.25;
+  const idler_r  = Math.max(6, 9 * scale);
+  const pitch    = Math.max(8, 12 * scale);
+
+  // Wing roll endpoints
+  const wl_x1 = cx - ctr_len/2 - wing_len * Math.cos(ang);
+  const wl_y1 = cy + wing_len * Math.sin(ang);
+  const wl_x2 = cx - ctr_len/2;
+  const wl_y2 = cy;
+  const wr_x1 = cx + ctr_len/2;
+  const wr_y1 = cy;
+  const wr_x2 = cx + ctr_len/2 + wing_len * Math.cos(ang);
+  const wr_y2 = cy + wing_len * Math.sin(ang);
+
+  // Belt path (follows idler contour)
+  const beltPath = `M${wl_x1-idler_r},${wl_y1+5} L${wl_x1},${wl_y1} L${wl_x2},${wl_y2} L${wr_x1},${wr_y1} L${wr_x2},${wr_y2} L${wr_x2+idler_r},${wr_y2+5}`;
+  const material_path = `M${wl_x1+2},${wl_y1} L${wl_x2},${wl_y2-2} L${wr_x1},${wr_y1-2} L${wr_x2-2},${wr_y2} Z`;
+
+  // Frame cross members
+  const frameY = cy + wing_len * Math.sin(ang) + 20 * scale;
+
+  const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" style="font-family:Arial,sans-serif">
+  <rect width="${W}" height="${H}" fill="#fafbfc"/>
+
+  <!-- CROSS SECTION LABEL -->
+  <text x="${W/2}" y="${20*scale}" text-anchor="middle" font-size="${Math.max(9,12*scale)}" fill="#1e3a5f" font-weight="bold">SECTION A-A  (Troughed Idler Cross-Section)</text>
+
+  <!-- FRAME SIDE PLATES -->
+  <line x1="${wl_x1-idler_r-10*scale}" y1="${frameY-5*scale}" x2="${wl_x1-idler_r-10*scale}" y2="${frameY+20*scale}" stroke="#2c3e50" stroke-width="${Math.max(3,4*scale)}"/>
+  <line x1="${wr_x2+idler_r+10*scale}" y1="${frameY-5*scale}" x2="${wr_x2+idler_r+10*scale}" y2="${frameY+20*scale}" stroke="#2c3e50" stroke-width="${Math.max(3,4*scale)}"/>
+  <!-- BOTTOM CROSS MEMBER -->
+  <line x1="${wl_x1-idler_r-10*scale}" y1="${frameY+20*scale}" x2="${wr_x2+idler_r+10*scale}" y2="${frameY+20*scale}" stroke="#2c3e50" stroke-width="${Math.max(2,3*scale)}"/>
+  <!-- IDLER SUPPORT BRACKETS -->
+  <line x1="${wl_x1}" y1="${wl_y1+idler_r}" x2="${wl_x1-5*scale}" y2="${frameY-5*scale}" stroke="#4a5568" stroke-width="${Math.max(1.5,2*scale)}"/>
+  <line x1="${wr_x2}" y1="${wr_y2+idler_r}" x2="${wr_x2+5*scale}" y2="${frameY-5*scale}" stroke="#4a5568" stroke-width="${Math.max(1.5,2*scale)}"/>
+
+  <!-- CENTRE IDLER ROLL -->
+  <rect x="${cx-ctr_len/2}" y="${cy-idler_r}" width="${ctr_len}" height="${idler_r*2}" fill="#6c7a8e" stroke="#34495e" stroke-width="${Math.max(1.5,2*scale)}" rx="${idler_r}"/>
+
+  <!-- LEFT WING ROLL -->
+  <g transform="translate(${wl_x2},${wl_y2}) rotate(${-b.troughing_angle_deg})">
+    <rect x="${-wing_len}" y="${-idler_r}" width="${wing_len}" height="${idler_r*2}" fill="#8e9eab" stroke="#5d6d7e" stroke-width="${Math.max(1.5,2*scale)}" rx="${idler_r}"/>
+  </g>
+
+  <!-- RIGHT WING ROLL -->
+  <g transform="translate(${wr_x1},${wr_y1}) rotate(${b.troughing_angle_deg})">
+    <rect x="0" y="${-idler_r}" width="${wing_len}" height="${idler_r*2}" fill="#8e9eab" stroke="#5d6d7e" stroke-width="${Math.max(1.5,2*scale)}" rx="${idler_r}"/>
+  </g>
+
+  <!-- MATERIAL LOAD (cross-hatched) -->
+  <path d="${material_path}" fill="url(#xhatch)" stroke="none" opacity="0.6"/>
+
+  <!-- BELT -->
+  <path d="${beltPath}" fill="none" stroke="#c8a000" stroke-width="${Math.max(3,4*scale)}" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- LOAD SKIRT BOARDS -->
+  <line x1="${cx-ctr_len/2-5*scale}" y1="${cy-20*scale}" x2="${wl_x2-5*scale}" y2="${wl_y2}" stroke="#c0392b" stroke-width="${Math.max(2,3*scale)}"/>
+  <line x1="${cx+ctr_len/2+5*scale}" y1="${cy-20*scale}" x2="${wr_x1+5*scale}" y2="${wr_y1}" stroke="#c0392b" stroke-width="${Math.max(2,3*scale)}"/>
+  <text x="${cx}" y="${cy-26*scale}" text-anchor="middle" font-size="${Math.max(7,8*scale)}" fill="#c0392b">LOAD SKIRTS</text>
+
+  <!-- ANNOTATIONS -->
+  <text x="${wl_x1-5*scale}" y="${wl_y1+idler_r+14*scale}" font-size="${Math.max(7,8*scale)}" fill="#4a5568" text-anchor="end">WING ROLL</text>
+  <text x="${wr_x2+5*scale}" y="${wr_y2+idler_r+14*scale}" font-size="${Math.max(7,8*scale)}" fill="#4a5568">WING ROLL</text>
+  <text x="${cx}" y="${cy+idler_r+14*scale}" text-anchor="middle" font-size="${Math.max(7,8*scale)}" fill="#4a5568">CENTRE ROLL</text>
+  <text x="${cx}" y="${cy-idler_r-12*scale}" text-anchor="middle" font-size="${Math.max(7,8*scale)}" fill="#c8a000" font-weight="bold">BELT</text>
+
+  <!-- TROUGH ANGLE ARC -->
+  <path d="M${cx-ctr_len/2},${cy} A${20*scale},${20*scale} 0 0,0 ${cx-ctr_len/2-18*scale*Math.cos(ang)},${cy+18*scale*Math.sin(ang)}" fill="none" stroke="#2980b9" stroke-width="1.5"/>
+  <text x="${cx-ctr_len/2-22*scale}" y="${cy+10*scale}" text-anchor="end" font-size="${Math.max(7,9*scale)}" fill="#2980b9" font-weight="bold">${b.troughing_angle_deg}°</text>
+
+  <!-- BELT WIDTH DIMENSION -->
+  <line x1="${wl_x1-idler_r}" y1="${cy-40*scale}" x2="${wr_x2+idler_r}" y2="${cy-40*scale}" stroke="#2980b9" stroke-width="1" stroke-dasharray="4,2"/>
+  <text x="${cx}" y="${cy-43*scale}" text-anchor="middle" font-size="${Math.max(7,9*scale)}" fill="#2980b9" font-weight="bold">BELT WIDTH = ${b.width_mm} mm</text>
+  <line x1="${wl_x1-idler_r}" y1="${cy-45*scale}" x2="${wl_x1-idler_r}" y2="${cy-35*scale}" stroke="#2980b9" stroke-width="1"/>
+  <line x1="${wr_x2+idler_r}" y1="${cy-45*scale}" x2="${wr_x2+idler_r}" y2="${cy-35*scale}" stroke="#2980b9" stroke-width="1"/>
+
+  <!-- TITLE BLOCK -->
+  <defs>
+    <pattern id="xhatch" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
+      <line x1="0" y1="0" x2="0" y2="8" stroke="#888" stroke-width="1"/>
+      <line x1="0" y1="0" x2="8" y2="0" stroke="#888" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect x="0" y="${H-28*scale}" width="${W}" height="${28*scale}" fill="#1e3a5f"/>
+  <text x="10" y="${H-14*scale}" fill="white" font-size="${Math.max(8,10*scale)}" font-weight="bold">${b.tag} — SECTION A-A (CROSS SECTION)</text>
+  <text x="10" y="${H-4*scale}" fill="#a8c4e0" font-size="${Math.max(6,8*scale)}">BELT WIDTH: ${b.width_mm}mm | TROUGHING ANGLE: ${b.troughing_angle_deg}° | PROMAN MACHINERY</text>
+  <rect x="2" y="2" width="${W-4}" height="${H-4}" fill="none" stroke="#1e3a5f" stroke-width="2" rx="3"/>
+</svg>`;
+  return svg;
+}
+
+// ALL VIEWS (combined sheet)
+function buildAllViewsSVG(b, scale) {
+  // Composite: elevation top, plan mid-left, cross-section mid-right
+  const elSVG   = buildElevationSVG(b, scale * 0.75);
+  const planSVG = buildPlanSVG(b, scale * 0.7);
+  const crossSVG = buildCrossSectionSVG(b, scale * 0.65);
+
+  // Extract viewport sizes by parsing viewBox / width
+  function extractDims(svgStr) {
+    const wm = svgStr.match(/width="([^"]+)"/);
+    const hm = svgStr.match(/height="([^"]+)"/);
+    return { w: parseFloat(wm?.[1]||0), h: parseFloat(hm?.[1]||0) };
+  }
+  const ed = extractDims(elSVG);
+  const pd = extractDims(planSVG);
+  const cd = extractDims(crossSVG);
+
+  const bottomW = pd.w + cd.w + 20;
+  const totalW  = Math.max(ed.w, bottomW) + 20;
+  const totalH  = ed.h + Math.max(pd.h, cd.h) + 60;
+
+  // wrap each SVG as foreignObject
+  const toFO = (svgStr, x, y, w, h) =>
+    `<g transform="translate(${x},${y})">${svgStr.replace(/<svg[^>]*>/, '').replace('</svg>','')}</g>`;
+
+  const combinedSVG = `
+<svg xmlns="http://www.w3.org/2000/svg" width="${totalW}" height="${totalH}" style="font-family:Arial,sans-serif">
+  <rect width="${totalW}" height="${totalH}" fill="#d4d8df"/>
+  <text x="${totalW/2}" y="20" text-anchor="middle" font-size="${Math.max(9,12*scale)}" fill="#1e3a5f" font-weight="bold">
+    ${b.tag} — ASSEMBLY DRAWING  |  ${b.purpose.replace(/_/g,' ').toUpperCase()}  |  W:${b.width_mm}mm × L:${b.length_m}m × θ:${b.incline_deg}° × ${b.hp}HP
+  </text>
+  <!-- ELEVATION -->
+  <g transform="translate(10, 30)">${elSVG.replace(/<svg[^>]*>/, '').replace('</svg>','')}</g>
+  <!-- PLAN -->
+  <g transform="translate(10, ${ed.h+40})">${planSVG.replace(/<svg[^>]*>/, '').replace('</svg>','')}</g>
+  <!-- CROSS SECTION -->
+  <g transform="translate(${pd.w+20}, ${ed.h+40})">${crossSVG.replace(/<svg[^>]*>/, '').replace('</svg>','')}</g>
+  <!-- BORDER -->
+  <rect x="2" y="2" width="${totalW-4}" height="${totalH-4}" fill="none" stroke="#1e3a5f" stroke-width="3" rx="4"/>
+</svg>`;
+  return combinedSVG;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MANUFACTURING BOM
+// ─────────────────────────────────────────────────────────────────────────────
+function renderBOM() {
+  if (!_active) return;
+  const b = _active;
+  const n_ci = b.num_idler_sets || Math.ceil(b.horiz_m / (b.carrying_idler_pitch_mm/1000)) + 1;
+  const n_ri = Math.ceil(b.horiz_m / (b.return_idler_pitch_mm/1000)) + 1;
+  const n_ii = 3;  // 3 sets impact idlers at feed
+  const beltLen = (b.length_m * 2 + 1.5).toFixed(1);  // top + return + splice ~1.5m
+
+  const items = [
+    // SL, description, material/spec, qty, unit
+    [1,  'Head Pulley (Drive)',          `Ø${b.head_pulley_dia_mm}mm, ${b.width_mm+100}mm face, EN8 shaft, rubber lagged`, 1, 'No'],
+    [2,  'Tail Pulley (Non-Drive)',       `Ø${b.tail_pulley_dia_mm}mm, ${b.width_mm+100}mm face, EN8 shaft, plain`,         1, 'No'],
+    [3,  'Snub Pulley',                  `Ø${b.snub_pulley_dia_mm}mm, ${b.width_mm+100}mm face, EN8 shaft`,                 1, 'No'],
+    [4,  'Bend Pulley (Take-Up)',        `Ø${b.bend_pulley_dia_mm}mm, ${b.width_mm+100}mm face, EN8 shaft`,                 1, 'No'],
+    [5,  'Carrying (Trough) Idler Set', `3-roll, ${b.troughing_angle_deg}°, ISMC idler, Ø89mm tube`,                        n_ci, 'Sets'],
+    [6,  'Return Idler (Flat)',          `1-roll, Ø89mm tube, ISMC bracket`,                                                 n_ri, 'Sets'],
+    [7,  'Impact Idler Set',             `3-roll rubber disc, Ø127mm, near feed chute`,                                      n_ii, 'Sets'],
+    [8,  'Transition Idler Set',         `3-roll, adjustable angle 0–${b.troughing_angle_deg}°`,                             2, 'Sets'],
+    [9,  'Belt',                         `EP400/4, ${b.width_mm}mm wide, 3+1.5mm covers`,                                   beltLen, 'm'],
+    [10, 'Electric Motor',               `${b.motor_kw} kW / ${b.hp} HP, 1440 RPM, TEFC, IE3, 415V/3Ph/50Hz`,               1, 'No'],
+    [11, 'Helical Gearbox',              `Ratio ~20:1, output ≥ ${(b.motor_kw*1.15).toFixed(1)} kW, B5 flange mount`,        1, 'No'],
+    [12, 'Fluid Coupling',               `Voith/Fenner type, ${b.motor_kw} kW rated`,                                        1, 'No'],
+    [13, 'Rigid Coupling (Gearbox-Pulley)', `Bibby/Falk type, jaw coupling`,                                                 1, 'No'],
+    [14, 'Plummer Blocks (Bearings)',    `SKF/FAG self-aligning, 2-bolt, per shaft`,                                          8, 'No'],
+    [15, 'Main Frame / Stringer',        `ISMC ${b.frame_type==='truss'?'150x75':'100x50'} @ ${b.length_m}m pairs`,          2, 'Sets'],
+    [16, 'Support Legs & Bracing',       `MS square hollow 75x75x4mm, hot-dip galv.`,                                        Math.ceil(b.length_m/5)*2, 'No'],
+    [17, 'Head End Frame',               `MS fabricated, drive side + NDE, 5mm plate`,                                       1, 'Set'],
+    [18, 'Tail End Frame',               `MS fabricated, with feed chute guide`,                                              1, 'Set'],
+    [19, 'Take-Up Assembly',             `${b.take_up_type==='gravity'?'Gravity type, M.S. counter weight box':'Screw type, M.S. rod + lock nut'}, travel ${b.take_up_travel_mm}mm`, 1, 'Set'],
+    [20, 'Feed Chute',                   `MS 6mm + 10mm WI wear plate lined, bolted flange`,                                 1, 'No'],
+    [21, 'Discharge Chute',              `MS 6mm + 10mm WI wear plate lined, bolted flange`,                                 1, 'No'],
+    [22, 'Load Skirt Board',             `MS 50×6mm flat bar + 15mm rubber seal, ${b.skirt_length_m}m each side`,             2, 'No'],
+    [23, 'Primary Belt Scraper',         `Tungsten tip / polyurethane blade, spring tension, at head`,                        1, 'No'],
+    [24, 'Secondary Belt Scraper',       `Diagonal V-plough type, near tail`,                                                 1, 'No'],
+    [25, 'Belt Misalignment Switch',     `Both sides, at head & tail ends`,                                                   4, 'No'],
+    [26, 'Belt Sway Switch',             `Both sides, mid conveyor`,                                                           2, 'No'],
+    [27, 'Pull Cord Emergency Stop',     `Rope pull switch, both sides full length`,                                           2, 'Sets'],
+    [28, 'Speed Monitor Sensor',         `Belt underspeed/zero-speed, at tail end`,                                            1, 'No'],
+    [29, 'Anchor Bolts & Sole Plates',   `M24 chemset + MS sole plate 300×300×16mm`,                                          Math.ceil(b.length_m/5)*4, 'Sets'],
+    [30, 'Fasteners (Structural)',       `MS hex bolts, HT 8.8 grade, hot dip galv.`,                                         1, 'Lot'],
+    [31, 'Walkway / Access Platform',   `MS chequered plate 3mm, handrail 40NB MS pipe`,                                      1, 'Lot'],
+    [32, 'Paint / Surface Treatment',    `Shot blast SA2.5, 2×PU primer + 1×PU finish, RAL 7035`,                             1, 'Lot'],
+  ];
+
+  const bomSection = document.getElementById('bom-section');
+  bomSection.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>SL</th><th>Item Description</th><th>Spec / Standard</th><th>Qty</th><th>Unit</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${items.map(([sl,desc,spec,qty,unit])=>`
+          <tr>
+            <td style="text-align:center;font-weight:700">${sl}</td>
+            <td style="font-weight:600">${desc}</td>
+            <td style="color:var(--sub)">${spec}</td>
+            <td style="text-align:center">${qty}</td>
+            <td style="text-align:center">${unit}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>`;
+}
+
+function toggleBOM() {
+  const el = document.getElementById('bom-section');
+  el.classList.toggle('show');
+  if (el.classList.contains('show') && _active) renderBOM();
+}
+
+function printDrawing() {
+  if (!_active) { alert('Select a belt first.'); return; }
+  const svgEl = document.querySelector('.drawing-frame svg');
+  if (!svgEl) return;
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html><html><head><title>${_active.tag} Drawing</title>
+  <style>@media print{body{margin:0}svg{max-width:100%;height:auto}}</style></head><body>
+  ${svgEl.outerHTML}</body></html>`);
+  win.document.close();
+  win.focus();
+  win.print();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INIT — pre-populate from URL params if provided
+// ─────────────────────────────────────────────────────────────────────────────
+(function initFromURL() {
+  const p = new URLSearchParams(window.location.search);
+  if (p.get('tph'))    document.getElementById('sel-tph').value    = p.get('tph');
+  if (p.get('stages')) document.getElementById('sel-stages').value = p.get('stages');
+})();
+loadBelts();
+</script>
+</body>
+</html>

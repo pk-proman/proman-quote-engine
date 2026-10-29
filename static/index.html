@@ -513,6 +513,7 @@ function renderQuoteResult(d, req) {
     <button class="btn btn-navy" onclick="downloadDocx()">⬇ Offer Letter (.docx)</button>
     <button class="btn btn-outline" onclick="downloadDeepBom()">⬇ Deep BOM (.xlsx)</button>
     <button class="btn btn-outline" onclick="open3DLayout()">🏗️ 3D Layout</button>
+    <button class="btn btn-outline" onclick="openConveyorDrawing()">📐 BC Drawings</button>
   </div>
 
   <!-- Tabs -->
@@ -619,6 +620,13 @@ function open3DLayout() {
   const p = lastQuoteReq;
   const q = `tph=${p.tph}&stages=${p.stages}&material=${encodeURIComponent(p.material||'Granite')}`;
   window.open(`/layout3d?${q}`, '_blank');
+}
+
+function openConveyorDrawing() {
+  if (!lastQuoteReq) { alert('Generate a quote first, then click BC Drawings.'); return; }
+  const p = lastQuoteReq;
+  const q = `tph=${p.tph}&stages=${p.stages}`;
+  window.open(`/conveyor-drawing?${q}`, '_blank');
 }
 
 let _bomLoaded = false;

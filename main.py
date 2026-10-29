@@ -3,7 +3,7 @@ PROMAN Quotation Engine — FastAPI Web Application
 Run:  uvicorn main:app --reload --port 8000
 """
 
-import sys, os, uuid, tempfile, json, traceback
+import sys, os, uuid, tempfile, json, traceback, math
 from datetime import date
 from pathlib import Path
 from typing import Optional, List
@@ -983,6 +983,128 @@ async def download_bom_excel(
 async def layout3d_page(_: dict = Depends(require_login)):
     p = STATIC / "layout3d.html"
     return p.read_text() if p.exists() else HTMLResponse("<h2>layout3d.html not found</h2>", 404)
+
+
+# ---------------------------------------------------------------------------
+# BELT CONVEYOR DRAWING ENDPOINTS
+# ---------------------------------------------------------------------------
+
+@app.get("/conveyor-drawing", response_class=HTMLResponse)
+async def conveyor_drawing_page(_: dict = Depends(require_login)):
+    p = STATIC / "conveyor-drawing.html"
+    return p.read_text() if p.exists() else HTMLResponse("<h2>conveyor-drawing.html not found</h2>", 404)
+
+
+@app.get("/api/conveyor-drawing/belts")
+async def get_conveyor_belts(
+    tph: int = 300,
+    stages: int = 3,
+    material: str = "granite",
+    _: dict = Depends(require_login)
+):
+    """Return belt conveyor specs with drawing parameters for the given plant config."""
+    from engine.engine import build_quotation
+    spec = _make_spec_from_params(tph, stages, material)
+    q = build_quotation(spec)
+
+    belts = []
+    for c in q.sub_b_conveyors:
+        horiz_m = c.length_m  # length_m is already slant/true length; approximate horizontal
+        # Derive inclination from purpose tag
+        incline_deg = _infer_inclination(c.purpose)
+        true_len = c.length_m
+        horiz_m = round(true_len * math.cos(math.radians(incline_deg)), 1)
+        rise_m  = round(true_len * math.sin(math.radians(incline_deg)), 1)
+
+        belt = {
+            "tag":           c.tag,
+            "purpose":       c.purpose,
+            "width_mm":      c.width_mm,
+            "length_m":      true_len,
+            "horiz_m":       horiz_m,
+            "rise_m":        rise_m,
+            "incline_deg":   incline_deg,
+            "hp":            c.hp,
+            "motor_kw":      round(c.hp * 0.7457, 1),
+            # derived drawing parameters
+            "head_pulley_dia_mm":  _head_pulley_dia(c.width_mm),
+            "tail_pulley_dia_mm":  _tail_pulley_dia(c.width_mm),
+            "snub_pulley_dia_mm":  _snub_pulley_dia(c.width_mm),
+            "bend_pulley_dia_mm":  _bend_pulley_dia(c.width_mm),
+            "carrying_idler_pitch_mm":  _idler_pitch(c.width_mm, "carry"),
+            "return_idler_pitch_mm":    _idler_pitch(c.width_mm, "return"),
+            "impact_idler_pitch_mm":    150,
+            "troughing_angle_deg": 35,
+            "belt_speed_mps":      _belt_speed(c.width_mm, tph),
+            "skirt_length_m":      min(3.0, round(true_len * 0.15, 1)),
+            "take_up_type":        "gravity" if true_len > 30 else "screw",
+            "take_up_travel_mm":   _take_up_travel(true_len),
+            "num_idler_sets":      int(horiz_m / (_idler_pitch(c.width_mm, "carry") / 1000)) + 1,
+            "frame_type":          "truss" if true_len > 20 else "channel",
+            "cost_lakhs":          c.cost_lakhs,
+        }
+        belts.append(belt)
+
+    return {"tph": tph, "stages": stages, "material": material, "belts": belts}
+
+
+def _make_spec_from_params(tph: int, stages: int, material: str):
+    """Build a PlantSpec from basic params (no override fields)."""
+    from engine.quotation_configs import get_spec
+    try:
+        return get_spec(tph, stages)
+    except Exception:
+        from engine.engine import PlantSpec
+        return PlantSpec(client_name="drawing", tph=tph, stages=stages, material=material)
+
+
+def _infer_inclination(purpose: str) -> float:
+    """Infer typical inclination angle from conveyor purpose tag."""
+    p = purpose.lower()
+    if "reclaim" in p or "hopper" in p or "feeder" in p:
+        return 0.0
+    if "product" in p or "stacker" in p or "stock" in p:
+        return 12.0
+    if "jaw_to" in p or "to_cone" in p or "to_screen" in p or "to_vsi" in p:
+        return 18.0
+    if "surge" in p and "from" in p:
+        return 0.0
+    if "oversize" in p or "return" in p or "recircul" in p:
+        return 16.0
+    if "under" in p:
+        return 0.0
+    return 14.0  # typical inclined
+
+
+def _head_pulley_dia(w: int) -> int:
+    return {500: 400, 650: 500, 800: 630, 1000: 800, 1200: 1000}.get(w, 630)
+
+def _tail_pulley_dia(w: int) -> int:
+    return {500: 315, 650: 400, 800: 500, 1000: 630, 1200: 800}.get(w, 500)
+
+def _snub_pulley_dia(w: int) -> int:
+    return {500: 250, 650: 315, 800: 400, 1000: 500, 1200: 630}.get(w, 315)
+
+def _bend_pulley_dia(w: int) -> int:
+    return {500: 250, 650: 315, 800: 400, 1000: 500, 1200: 630}.get(w, 315)
+
+def _idler_pitch(w: int, kind: str) -> int:
+    if kind == "return":
+        return {500: 3000, 650: 3000, 800: 3000, 1000: 3000, 1200: 3000}.get(w, 3000)
+    # carrying idler pitch (mm)
+    return {500: 1200, 650: 1200, 800: 1000, 1000: 1000, 1200: 900}.get(w, 1200)
+
+def _belt_speed(w: int, tph: int) -> float:
+    # approximate belt speed (m/s) for given width and capacity
+    if w <= 500:  return 1.25
+    if w <= 650:  return 1.5
+    if w <= 800:  return 1.75 if tph <= 200 else 2.0
+    if w <= 1000: return 2.0  if tph <= 400 else 2.5
+    return 2.5
+
+def _take_up_travel(length_m: float) -> int:
+    # gravity take-up travel = ~1.5% of centre-to-centre, min 500mm
+    return max(500, int(length_m * 0.015 * 1000))
 
 
 # ---------------------------------------------------------------------------
